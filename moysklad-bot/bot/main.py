@@ -13,7 +13,7 @@ from aiogram.types import TelegramObject, Update
 
 from .config import Config, load_config
 from .handlers import routers
-from .handlers.report import build_report_text
+from .handlers.report import build_full_report_text
 from .moysklad import MoySkladClient
 
 logging.basicConfig(level=logging.INFO)
@@ -53,8 +53,10 @@ def _seconds_until(hour: int, minute: int) -> float:
 
 
 async def daily_report_loop(bot: Bot, moysklad: MoySkladClient, config: Config) -> None:
-    """Pushes the balance/income/expense report to every owner once a day,
-    so nobody has to remember to type /balance.
+    """Pushes the full report (income + expense + balance) to owners and
+    directors once a day, so nobody has to remember to type /balance.
+    Regular employees are never included here — they only see the balance,
+    and only when they ask for it via /balance.
     """
     try:
         hour_str, minute_str = config.daily_report_time.split(":")
@@ -68,15 +70,15 @@ async def daily_report_loop(bot: Bot, moysklad: MoySkladClient, config: Config) 
     while True:
         await asyncio.sleep(_seconds_until(hour, minute))
         try:
-            text = await build_report_text(moysklad)
+            text = await build_full_report_text(moysklad)
         except Exception:
             logger.exception("Failed to build scheduled daily report")
             continue
-        for owner_id in config.owner_ids:
+        for management_id in config.management_ids:
             try:
-                await bot.send_message(owner_id, text)
+                await bot.send_message(management_id, text)
             except Exception:
-                logger.exception("Failed to send daily report to owner_id=%s", owner_id)
+                logger.exception("Failed to send daily report to user_id=%s", management_id)
 
 
 async def main() -> None:
@@ -84,8 +86,7 @@ async def main() -> None:
     bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=MemoryStorage())
 
-    allowed_ids = set(config.owner_ids) | set(config.employee_ids)
-    dp.update.outer_middleware(AccessControlMiddleware(allowed_ids))
+    dp.update.outer_middleware(AccessControlMiddleware(config.allowed_ids))
 
     for router in routers:
         dp.include_router(router)
@@ -93,8 +94,10 @@ async def main() -> None:
     moysklad = MoySkladClient(config.moysklad_token)
 
     logger.info(
-        "Starting bot: %d owner(s), %d employee(s) allowed, daily report at %s",
+        "Starting bot: %d owner(s), %d director(s), %d employee(s) allowed, "
+        "daily report at %s",
         len(config.owner_ids),
+        len(config.director_ids),
         len(config.employee_ids),
         config.daily_report_time,
     )
