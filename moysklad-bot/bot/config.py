@@ -1,0 +1,37 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+@dataclass
+class Config:
+    bot_token: str
+    moysklad_token: str
+    owner_ids: list[int]
+    employee_ids: list[int]
+
+
+def _parse_ids(raw: str) -> list[int]:
+    return [int(chunk.strip()) for chunk in raw.split(",") if chunk.strip()]
+
+
+def load_config() -> Config:
+    bot_token = os.environ["BOT_TOKEN"]
+    moysklad_token = os.environ["MOYSKLAD_TOKEN"]
+    owner_ids = _parse_ids(os.environ.get("OWNER_IDS", ""))
+    employee_ids = _parse_ids(os.environ.get("EMPLOYEE_IDS", ""))
+
+    if not owner_ids:
+        raise RuntimeError("OWNER_IDS не задан — некому будет видеть отчёты через /today")
+
+    return Config(
+        bot_token=bot_token,
+        moysklad_token=moysklad_token,
+        owner_ids=owner_ids,
+        employee_ids=employee_ids,
+    )
