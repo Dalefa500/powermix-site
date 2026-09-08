@@ -14,6 +14,7 @@ class Config:
     moysklad_token: str
     owner_ids: list[int]
     employee_ids: list[int]
+    daily_report_time: str
 
 
 def _parse_ids(raw: str) -> list[int]:
@@ -25,6 +26,7 @@ def load_config() -> Config:
     moysklad_token = os.environ["MOYSKLAD_TOKEN"]
     owner_ids = _parse_ids(os.environ.get("OWNER_IDS", ""))
     employee_ids = _parse_ids(os.environ.get("EMPLOYEE_IDS", ""))
+    daily_report_time = os.environ.get("DAILY_REPORT_TIME", "20:00")
 
     if not owner_ids:
         raise RuntimeError("OWNER_IDS не задан — некому будет видеть отчёты через /today")
@@ -34,4 +36,5 @@ def load_config() -> Config:
         moysklad_token=moysklad_token,
         owner_ids=owner_ids,
         employee_ids=employee_ids,
+        daily_report_time=daily_report_time,
     )

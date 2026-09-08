@@ -134,3 +134,47 @@ class MoySkladClient:
             },
         )
         return sum(row.get("sum", 0) for row in data.get("rows", [])) / 100
+
+    async def get_account_balances(self) -> list[dict]:
+        """Current balance per cash register / bank account via MoySklad's
+        own money report (/report/money/byaccount). Not available on every
+        tariff/account — raises MoySkladError if the endpoint doesn't return
+        the expected shape, so callers should fall back to
+        get_total_cash_balance_fallback().
+        """
+        data = await self._request("GET", "/report/money/byaccount")
+        rows = data.get("rows") if isinstance(data, dict) else data
+        if not isinstance(rows, list):
+            raise MoySkladError("Неожиданный формат ответа /report/money/byaccount")
+
+        balances = []
+        for row in rows:
+            account = row.get("account") or {}
+            balances.append(
+                {
+                    "name": account.get("name", "Касса"),
+                    "balance": row.get("balance", 0) / 100,
+                }
+            )
+        return balances
+
+    async def get_total_cash_balance_fallback(self) -> float:
+        """Sums every cashin/cashout document ever recorded in the account
+        (paginated). Used when the money-by-account report isn't available.
+        Slow on accounts with very long history — fine for an on-demand or
+        once-a-day call.
+        """
+        total = 0.0
+        limit = 1000
+        for entity, sign in (("cashin", 1), ("cashout", -1)):
+            offset = 0
+            while True:
+                data = await self._request(
+                    "GET", f"/entity/{entity}", params={"limit": limit, "offset": offset}
+                )
+                rows = data.get("rows", [])
+                total += sign * sum(row.get("sum", 0) for row in rows) / 100
+                if len(rows) < limit:
+                    break
+                offset += limit
+        return total

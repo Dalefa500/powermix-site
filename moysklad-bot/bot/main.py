@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import logging
 from typing import Any, Awaitable, Callable
 
@@ -10,8 +11,9 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import TelegramObject, Update
 
-from .config import load_config
+from .config import Config, load_config
 from .handlers import routers
+from .handlers.report import build_report_text
 from .moysklad import MoySkladClient
 
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +44,41 @@ class AccessControlMiddleware(BaseMiddleware):
         return await handler(event, data)
 
 
+def _seconds_until(hour: int, minute: int) -> float:
+    now = dt.datetime.now()
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if target <= now:
+        target += dt.timedelta(days=1)
+    return (target - now).total_seconds()
+
+
+async def daily_report_loop(bot: Bot, moysklad: MoySkladClient, config: Config) -> None:
+    """Pushes the balance/income/expense report to every owner once a day,
+    so nobody has to remember to type /balance.
+    """
+    try:
+        hour_str, minute_str = config.daily_report_time.split(":")
+        hour, minute = int(hour_str), int(minute_str)
+    except ValueError:
+        logger.warning(
+            "Invalid DAILY_REPORT_TIME=%r, defaulting to 20:00", config.daily_report_time
+        )
+        hour, minute = 20, 0
+
+    while True:
+        await asyncio.sleep(_seconds_until(hour, minute))
+        try:
+            text = await build_report_text(moysklad)
+        except Exception:
+            logger.exception("Failed to build scheduled daily report")
+            continue
+        for owner_id in config.owner_ids:
+            try:
+                await bot.send_message(owner_id, text)
+            except Exception:
+                logger.exception("Failed to send daily report to owner_id=%s", owner_id)
+
+
 async def main() -> None:
     config = load_config()
     bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -56,14 +93,18 @@ async def main() -> None:
     moysklad = MoySkladClient(config.moysklad_token)
 
     logger.info(
-        "Starting bot: %d owner(s), %d employee(s) allowed",
+        "Starting bot: %d owner(s), %d employee(s) allowed, daily report at %s",
         len(config.owner_ids),
         len(config.employee_ids),
+        config.daily_report_time,
     )
+
+    daily_task = asyncio.create_task(daily_report_loop(bot, moysklad, config))
 
     try:
         await dp.start_polling(bot, moysklad=moysklad, config=config)
     finally:
+        daily_task.cancel()
         await moysklad.close()
         await bot.session.close()
 
