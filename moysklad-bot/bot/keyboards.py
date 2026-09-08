@@ -1,15 +1,23 @@
-from aiogram.types import InlineKeyboardMarkup
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+
+BTN_EXPENSE = "💸 Расход"
+BTN_INCOME = "💰 Доход"
+BTN_SHIPMENT = "📦 Отгрузка"
+BTN_OTHER = "🧾 Прочий расход"
+BTN_BALANCE = "📊 Баланс"
+
+NAV_BUTTONS = (BTN_EXPENSE, BTN_INCOME, BTN_SHIPMENT, BTN_OTHER, BTN_BALANCE)
 
 
-def main_menu_kb() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.button(text="💸 Расход", callback_data="menu:expense")
-    builder.button(text="💰 Доход", callback_data="menu:income")
-    builder.button(text="📦 Отгрузка", callback_data="menu:shipment")
-    builder.button(text="🧾 Прочий расход", callback_data="menu:other")
-    builder.adjust(2, 2)
-    return builder.as_markup()
+def main_reply_kb() -> ReplyKeyboardMarkup:
+    """Persistent bottom menu — always visible, works like an app's tab bar
+    instead of buttons that scroll away in the chat history."""
+    builder = ReplyKeyboardBuilder()
+    for text in NAV_BUTTONS:
+        builder.button(text=text)
+    builder.adjust(2, 2, 1)
+    return builder.as_markup(resize_keyboard=True)
 
 
 def confirm_kb(yes_data: str, no_data: str) -> InlineKeyboardMarkup:

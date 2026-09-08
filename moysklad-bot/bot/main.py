@@ -9,7 +9,7 @@ from aiogram import BaseMiddleware, Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import TelegramObject, Update
+from aiogram.types import BotCommand, TelegramObject, Update
 
 from .config import Config, load_config
 from .handlers import routers
@@ -84,6 +84,12 @@ async def daily_report_loop(bot: Bot, moysklad: MoySkladClient, config: Config) 
 async def main() -> None:
     config = load_config()
     bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="Открыть меню"),
+            BotCommand(command="balance", description="Показать баланс/кассу"),
+        ]
+    )
     dp = Dispatcher(storage=MemoryStorage())
 
     dp.update.outer_middleware(AccessControlMiddleware(config.allowed_ids))

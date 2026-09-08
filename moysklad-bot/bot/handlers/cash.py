@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import logging
 
-from aiogram import F, Router
+from aiogram import Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import Message
 
-from ..keyboards import cancel_kb, main_menu_kb
+from ..keyboards import BTN_EXPENSE, BTN_INCOME, BTN_OTHER, cancel_kb, main_reply_kb
 from ..moysklad import MoySkladClient, MoySkladError
 from ..states import CashForm
 
 logger = logging.getLogger(__name__)
 
+# Flow entry (tapping a menu button) is dispatched centrally from start.py,
+# with StateFilter("*"), so a menu tap always wins even if the user was
+# mid-way through typing something else. This router only owns the
+# in-progress FSM steps.
 router = Router(name="cash")
 
 KIND_LABELS = {
@@ -20,17 +24,20 @@ KIND_LABELS = {
     "other": "Прочий расход",
 }
 
+TEXT_TO_KIND = {
+    BTN_EXPENSE: "expense",
+    BTN_INCOME: "income",
+    BTN_OTHER: "other",
+}
 
-@router.callback_query(F.data.in_({"menu:expense", "menu:income", "menu:other"}))
-async def start_cash_flow(callback: CallbackQuery, state: FSMContext) -> None:
-    kind = callback.data.split(":", 1)[1]
+
+async def enter_cash_flow(message: Message, state: FSMContext, kind: str) -> None:
     await state.update_data(kind=kind)
     await state.set_state(CashForm.waiting_for_sum)
-    await callback.message.edit_text(
+    await message.answer(
         f"{KIND_LABELS[kind]}. Введи сумму (только число, например 1500):",
         reply_markup=cancel_kb(),
     )
-    await callback.answer()
 
 
 @router.message(CashForm.waiting_for_sum)
@@ -80,4 +87,4 @@ async def cash_comment_entered(
         )
 
     await state.clear()
-    await message.answer("Выбери, что внести дальше:", reply_markup=main_menu_kb())
+    await message.answer("Выбери действие в меню внизу 👇", reply_markup=main_reply_kb())

@@ -7,24 +7,25 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from ..keyboards import cancel_kb, confirm_kb, main_menu_kb
+from ..keyboards import cancel_kb, confirm_kb, main_reply_kb
 from ..moysklad import MoySkladClient, MoySkladError
 from ..states import ShipmentForm
 
 logger = logging.getLogger(__name__)
 
+# Flow entry (tapping "📦 Отгрузка") is dispatched centrally from start.py,
+# with StateFilter("*"), so a menu tap always wins even mid-flow. This
+# router only owns the in-progress FSM steps.
 router = Router(name="shipment")
 
 
-@router.callback_query(F.data == "menu:shipment")
-async def start_shipment_flow(callback: CallbackQuery, state: FSMContext) -> None:
+async def enter_shipment_flow(message: Message, state: FSMContext) -> None:
     await state.update_data(positions=[], client_href=None, client_name=None)
     await state.set_state(ShipmentForm.waiting_for_client_query)
-    await callback.message.edit_text(
+    await message.answer(
         "Отгрузка. Введи название клиента (можно часть названия):",
         reply_markup=cancel_kb(),
     )
-    await callback.answer()
 
 
 @router.message(ShipmentForm.waiting_for_client_query)
@@ -274,4 +275,4 @@ async def shipment_comment_entered(
         )
 
     await state.clear()
-    await message.answer("Выбери, что внести дальше:", reply_markup=main_menu_kb())
+    await message.answer("Выбери действие в меню внизу 👇", reply_markup=main_reply_kb())

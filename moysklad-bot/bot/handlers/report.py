@@ -65,8 +65,7 @@ async def build_balance_only_text(moysklad: MoySkladClient) -> str:
     return "\n".join(lines)
 
 
-@router.message(Command("today", "balance"))
-async def balance_report(message: Message, moysklad: MoySkladClient, config: Config) -> None:
+async def send_balance_report(message: Message, moysklad: MoySkladClient, config: Config) -> None:
     if not message.from_user:
         return
     user_id = message.from_user.id
@@ -77,3 +76,8 @@ async def balance_report(message: Message, moysklad: MoySkladClient, config: Con
         await message.answer(await build_balance_only_text(moysklad))
     else:
         await message.answer("Эта команда тебе недоступна.")
+
+
+@router.message(Command("today", "balance"))
+async def balance_report(message: Message, moysklad: MoySkladClient, config: Config) -> None:
+    await send_balance_report(message, moysklad, config)
