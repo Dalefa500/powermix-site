@@ -11,6 +11,7 @@ from aiogram.types import CallbackQuery, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..config import Config
+from ..currency import fmt
 from ..keyboards import PERIOD_LABELS, period_choice_kb
 from ..moysklad import MoySkladClient, MoySkladError
 
@@ -32,13 +33,13 @@ async def _get_balance_lines(moysklad: MoySkladClient) -> list[str]:
     if balances:
         lines = ["💼 Остаток по кассам/счетам:"]
         for b in balances:
-            lines.append(f"• {b['name']}: {b['balance']:.2f}")
-        lines.append(f"Итого остаток: {sum(b['balance'] for b in balances):.2f}")
+            lines.append(f"• {b['name']}: {fmt(b['balance'])}")
+        lines.append(f"Итого остаток: {fmt(sum(b['balance'] for b in balances))}")
         return lines
 
     try:
         total = await moysklad.get_total_cash_balance_fallback()
-        return [f"💼 Остаток в кассе (по всем ордерам с начала учёта): {total:.2f}"]
+        return [f"💼 Остаток в кассе (по всем ордерам с начала учёта): {fmt(total)}"]
     except MoySkladError:
         logger.exception("Failed to compute fallback cash balance")
         return ["⚠️ Не удалось посчитать остаток в кассе."]
@@ -56,9 +57,9 @@ async def build_full_report_text(moysklad: MoySkladClient) -> str:
     lines = [
         "📊 Отчёт по кассе",
         "",
-        f"Доход за сегодня: {income:.2f}",
-        f"Расход за сегодня: {expense:.2f}",
-        f"Итог за сегодня: {income - expense:.2f}",
+        f"Доход за сегодня: {fmt(income)}",
+        f"Расход за сегодня: {fmt(expense)}",
+        f"Итог за сегодня: {fmt(income - expense)}",
         "",
         *(await _get_balance_lines(moysklad)),
     ]
@@ -102,7 +103,7 @@ async def build_period_report_text(moysklad: MoySkladClient, period: str) -> str
         for day in sorted(daily):
             d = daily[day]
             day_label = day[8:10] + "." + day[5:7]
-            lines.append(f"{day_label}: доход {d['income']:.2f} / расход {d['expense']:.2f}")
+            lines.append(f"{day_label}: доход {fmt(d['income'])} / расход {fmt(d['expense'])}")
         if not daily:
             lines.append("(пока нет записей за этот период)")
     else:
@@ -113,15 +114,15 @@ async def build_period_report_text(moysklad: MoySkladClient, period: str) -> str
             monthly[month_key]["expense"] += d["expense"]
         for month_key in sorted(monthly):
             m = monthly[month_key]
-            lines.append(f"{month_key}: доход {m['income']:.2f} / расход {m['expense']:.2f}")
+            lines.append(f"{month_key}: доход {fmt(m['income'])} / расход {fmt(m['expense'])}")
         if not monthly:
             lines.append("(пока нет записей за этот период)")
 
     lines += [
         "",
-        f"Итого доход: {total_income:.2f}",
-        f"Итого расход: {total_expense:.2f}",
-        f"Итого прибыль: {total_income - total_expense:.2f}",
+        f"Итого доход: {fmt(total_income)}",
+        f"Итого расход: {fmt(total_expense)}",
+        f"Итого прибыль: {fmt(total_income - total_expense)}",
     ]
     return "\n".join(lines)
 
@@ -169,12 +170,12 @@ async def build_debts_text(moysklad: MoySkladClient) -> str:
     if they_owe:
         lines.append("Нам должны:")
         for d in sorted(they_owe, key=lambda r: -r["balance"]):
-            lines.append(f"• {d['name']}: {d['balance']:.2f}")
+            lines.append(f"• {d['name']}: {fmt(d['balance'])}")
         lines.append("")
     if we_owe:
         lines.append("Мы должны:")
         for d in sorted(we_owe, key=lambda r: r["balance"]):
-            lines.append(f"• {d['name']}: {-d['balance']:.2f}")
+            lines.append(f"• {d['name']}: {fmt(-d['balance'])}")
     return "\n".join(lines).strip()
 
 
@@ -202,9 +203,9 @@ async def build_counterparty_report_text(moysklad: MoySkladClient, entry: dict) 
     lines = [
         f"👤 {entry['name']}",
         "",
-        f"За сегодня: {today_data['total']:.2f}",
-        f"За этот месяц: {month_data['total']:.2f}",
-        f"Всего ({COUNTERPARTY_LOOKBACK_LABEL}): {entry['total']:.2f}",
+        f"За сегодня: {fmt(today_data['total'])}",
+        f"За этот месяц: {fmt(month_data['total'])}",
+        f"Всего ({COUNTERPARTY_LOOKBACK_LABEL}): {fmt(entry['total'])}",
     ]
 
     if month_data["daily"]:
@@ -212,7 +213,7 @@ async def build_counterparty_report_text(moysklad: MoySkladClient, entry: dict) 
         lines.append("По дням в этом месяце:")
         for day in sorted(month_data["daily"]):
             day_label = day[8:10] + "." + day[5:7]
-            lines.append(f"{day_label}: {month_data['daily'][day]:.2f}")
+            lines.append(f"{day_label}: {fmt(month_data['daily'][day])}")
 
     return "\n".join(lines)
 
@@ -255,7 +256,9 @@ async def send_counterparty_choice(
     await state.update_data(cp_choices=top)
     builder = InlineKeyboardBuilder()
     for i, entry in enumerate(top):
-        builder.button(text=f"{entry['name']} — {entry['total']:.0f}", callback_data=f"cpexp:{i}")
+        builder.button(
+            text=f"{entry['name']} — {entry['total']:.0f} с.", callback_data=f"cpexp:{i}"
+        )
     builder.adjust(1)
     await message.answer(
         "По какому контрагенту показать расход по дням/месяцам?",

@@ -6,6 +6,7 @@ from aiogram import Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
+from ..currency import fmt
 from ..keyboards import BTN_EXPENSE, BTN_INCOME, cancel_kb, main_reply_kb
 from ..moysklad import MoySkladClient, MoySkladError
 from ..states import CashForm
@@ -76,11 +77,11 @@ async def cash_comment_entered(
         await message.answer(
             "⚠️ Не получилось сохранить в МойСклад (ошибка API). Сообщи администратору — "
             "запись не потеряна, вот детали, чтобы внести вручную:\n"
-            f"{KIND_LABELS[kind]}, {amount:.2f}, «{comment}», от {employee}"
+            f"{KIND_LABELS[kind]}, {fmt(amount)}, «{comment}», от {employee}"
         )
     else:
         await message.answer(
-            f"Готово ✅ {KIND_LABELS[kind]}: {amount:.2f} — «{comment}» записано в МойСклад."
+            f"Готово ✅ {KIND_LABELS[kind]}: {fmt(amount)} — «{comment}» записано в МойСклад."
         )
 
     await state.clear()
