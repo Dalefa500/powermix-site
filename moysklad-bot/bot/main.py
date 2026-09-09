@@ -91,7 +91,7 @@ async def main() -> None:
             BotCommand(command="report", description="Отчёт: день/месяц/полгода/год"),
             BotCommand(command="stock", description="Остатки на складе"),
             BotCommand(command="debts", description="Задолженность контрагентов"),
-            BotCommand(command="counterparties", description="Расход по контрагентам"),
+            BotCommand(command="counterparties", description="Расход по команде"),
         ]
     )
     dp = Dispatcher(storage=MemoryStorage())

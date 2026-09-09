@@ -7,7 +7,7 @@ BTN_BALANCE = "📊 Баланс"
 BTN_REPORT = "📅 Отчёт"
 BTN_STOCK = "📦 Остатки"
 BTN_DEBTS = "📈 Долги"
-BTN_COUNTERPARTIES = "👥 Контрагенты"
+BTN_COUNTERPARTIES = "👥 Команда"
 
 NAV_BUTTONS = (
     BTN_EXPENSE,
@@ -26,6 +26,16 @@ PERIOD_LABELS = {
     "year": "Год",
 }
 
+# Finer-grained periods for the "Команда" report: 1/10/20/30 days, then
+# every month up to a year.
+CP_PERIOD_DAYS: dict[str, tuple[str, int]] = {
+    "d1": ("1 день", 1),
+    "d10": ("10 дней", 10),
+    "d20": ("20 дней", 20),
+    "d30": ("30 дней", 30),
+    **{f"m{n}": (f"{n} мес.", 30 * n) for n in range(2, 13)},
+}
+
 
 def main_reply_kb() -> ReplyKeyboardMarkup:
     """Persistent bottom menu — always visible, works like an app's tab bar
@@ -42,6 +52,14 @@ def period_choice_kb(prefix: str = "period") -> InlineKeyboardMarkup:
     for period, label in PERIOD_LABELS.items():
         builder.button(text=label, callback_data=f"{prefix}:{period}")
     builder.adjust(4)
+    return builder.as_markup()
+
+
+def cp_period_choice_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for key, (label, _days) in CP_PERIOD_DAYS.items():
+        builder.button(text=label, callback_data=f"cpperiod:{key}")
+    builder.adjust(4, 4, 4, 3)
     return builder.as_markup()
 
 

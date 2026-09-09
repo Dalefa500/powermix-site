@@ -12,8 +12,19 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..config import Config
 from ..currency import fmt
-from ..keyboards import PERIOD_LABELS, period_choice_kb
+from ..keyboards import CP_PERIOD_DAYS, PERIOD_LABELS, cp_period_choice_kb, period_choice_kb
 from ..moysklad import MoySkladClient, MoySkladError
+
+# Only these counterparties matter for the "Команда" report — everyone
+# else is noise for this view (there are dozens of expense categories in
+# the account's 5-year history). Keyed by the MoySklad search term, valued
+# by the role label to actually show in the bot.
+TRACKED_COUNTERPARTIES = {
+    "Дивиденды": "💼 Инвестор (вы)",
+    "Сулаймоншоев Убайд": "👔 Убайд — директор",
+    "Фозил Бухгалтер": "🧮 Фозил — бухгалтер",
+    "Файзов Дилшод": "💵 Дилшод — кассир",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +211,7 @@ async def build_counterparty_report_text(
         return "⚠️ Не получилось получить данные из МойСклад, попробуй позже."
 
     lines = [
-        f"👤 {entry['name']}",
+        entry["name"],
         "",
         f"За сегодня: {fmt(today_data['total'])}",
         f"За этот месяц: {fmt(month_data['total'])}",
@@ -236,28 +247,30 @@ async def send_period_choice(message: Message) -> None:
 
 async def send_counterparty_period_choice(message: Message) -> None:
     await message.answer(
-        "За какой период показать расход по контрагентам?",
-        reply_markup=period_choice_kb("cpperiod"),
+        "За какой период показать расход по команде?",
+        reply_markup=cp_period_choice_kb(),
     )
 
 
 async def _show_counterparty_list(
-    edit_target: Message, state: FSMContext, moysklad: MoySkladClient, period: str
+    edit_target: Message, state: FSMContext, moysklad: MoySkladClient, period_key: str
 ) -> None:
+    label, days = CP_PERIOD_DAYS[period_key]
     now = datetime.now()
-    start, title = _period_start(period, now)
+    start = now - timedelta(days=days)
+    title = f"за {label.lower()}"
 
-    await edit_target.edit_text(f"⏳ Считаю расход по контрагентам {title}...")
+    await edit_target.edit_text(f"⏳ Считаю расход по команде {title}...")
 
     try:
-        top = await moysklad.get_expense_by_counterparty(start, now)
+        top = await moysklad.get_named_counterparty_expenses(TRACKED_COUNTERPARTIES, start, now)
     except MoySkladError:
         logger.exception("Failed to fetch counterparty list")
         await edit_target.edit_text("⚠️ Не получилось получить данные из МойСклад, попробуй позже.")
         return
 
     if not top:
-        await edit_target.edit_text(f"Нет расходов, привязанных к контрагенту, {title}.")
+        await edit_target.edit_text(f"Нет расходов у отслеживаемых людей {title}.")
         return
 
     await state.update_data(cp_choices=top, cp_period_label=title)
@@ -268,7 +281,7 @@ async def _show_counterparty_list(
         )
     builder.adjust(1)
     await edit_target.edit_text(
-        f"Контрагенты {title}. По какому показать расход по дням?",
+        f"Команда {title}. По кому показать расход по дням?",
         reply_markup=builder.as_markup(),
     )
 
@@ -321,12 +334,12 @@ async def period_chosen(callback: CallbackQuery, moysklad: MoySkladClient) -> No
 async def counterparty_period_chosen(
     callback: CallbackQuery, state: FSMContext, moysklad: MoySkladClient
 ) -> None:
-    period = callback.data.split(":", 1)[1]
-    if period not in PERIOD_LABELS:
+    period_key = callback.data.split(":", 1)[1]
+    if period_key not in CP_PERIOD_DAYS:
         await callback.answer("Неизвестный период", show_alert=True)
         return
     await callback.answer()
-    await _show_counterparty_list(callback.message, state, moysklad, period)
+    await _show_counterparty_list(callback.message, state, moysklad, period_key)
 
 
 @router.callback_query(F.data.startswith("cpexp:"))
@@ -338,7 +351,7 @@ async def counterparty_chosen(
     choices: list[dict] = data.get("cp_choices", [])
     period_label = data.get("cp_period_label", "за выбранный период")
     if index >= len(choices):
-        await callback.answer("Список устарел, открой «Контрагенты» заново", show_alert=True)
+        await callback.answer("Список устарел, открой «Команда» заново", show_alert=True)
         return
     text = await build_counterparty_report_text(moysklad, choices[index], period_label)
     await callback.message.edit_text(text)

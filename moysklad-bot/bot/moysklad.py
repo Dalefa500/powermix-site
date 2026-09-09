@@ -275,48 +275,34 @@ class MoySkladClient:
                 daily[day][key] += row.get("sum", 0) / 100
         return daily
 
-    async def get_counterparty_name(self, href: str) -> str:
-        counterparty_id = href.rstrip("/").rsplit("/", 1)[-1]
-        data = await self._request("GET", f"/entity/counterparty/{counterparty_id}")
-        return data.get("name") or "Без названия"
-
-    async def get_expense_by_counterparty(
-        self, start: datetime, end: datetime, limit: int = 15
+    async def get_named_counterparty_expenses(
+        self, names: dict[str, str], start: datetime, end: datetime
     ) -> list[dict]:
-        """Total expense (cashout) grouped by counterparty (agent) — the same
-        contractor/person field already used throughout your 5 years of
-        МойСклад history (e.g. salary payments tagged with an employee's
-        name). Returns the top `limit` counterparties by total, each with
-        {name, href, total}.
-
-        Groups by href (not by the expanded agent name — some accounts
-        don't reliably return it inline), then resolves each of the top
-        entries' real name with one extra lookup each, so the ranking is
-        always correct even before names are known.
+        """Expense totals for a fixed, known list of counterparties, keyed
+        by the search term used to find them in MoySklad with the display
+        label to show instead (e.g. {"Дивиденды": "💼 Инвестор (вы)"}).
+        Resolved once via search then queried directly with a server-side
+        agent filter — far cheaper than scanning every cashout row in the
+        period when you only care about a handful of people.
         """
-        totals: dict[str, dict] = {}
-        for row in await self.get_cash_rows("cashout", start, end, expand_agent=True):
-            agent = row.get("agent") or {}
-            href = (agent.get("meta") or {}).get("href", "")
-            key = href or "no-agent"
-            entry = totals.setdefault(key, {"name": agent.get("name") or "", "href": href})
-            entry["total"] = entry.get("total", 0.0) + row.get("sum", 0) / 100
-
-        top = sorted(totals.values(), key=lambda e: -e["total"])[:limit]
-
-        for entry in top:
-            if entry["name"]:
-                continue
-            if entry["href"]:
-                try:
-                    entry["name"] = await self.get_counterparty_name(entry["href"])
-                except MoySkladError:
-                    logger.exception("Failed to resolve counterparty name for %s", entry["href"])
-                    entry["name"] = "Без названия"
-            else:
-                entry["name"] = "Без контрагента"
-
-        return top
+        results: list[dict] = []
+        seen_hrefs: set[str] = set()
+        for search_name, display_label in names.items():
+            candidates = await self.search_counterparty(search_name, limit=5)
+            for candidate in candidates:
+                href = candidate["meta"]["href"]
+                if href in seen_hrefs:
+                    continue
+                seen_hrefs.add(href)
+                breakdown = await self.get_counterparty_expense_breakdown(href, start, end)
+                results.append(
+                    {
+                        "name": display_label,
+                        "href": href,
+                        "total": breakdown["total"],
+                    }
+                )
+        return sorted(results, key=lambda e: -e["total"])
 
     async def get_counterparty_expense_breakdown(
         self, agent_href: str, start: datetime, end: datetime
