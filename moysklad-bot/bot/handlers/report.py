@@ -14,6 +14,7 @@ from ..config import Config
 from ..currency import fmt
 from ..keyboards import CP_PERIOD_DAYS, cp_period_choice_kb
 from ..moysklad import MoySkladClient, MoySkladError
+from ..tables import render_table
 
 # Only these counterparties matter for the "Команда" report — everyone
 # else is noise for this view (there are dozens of expense categories in
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 router = Router(name="report")
 
 
-async def _get_balance_lines(moysklad: MoySkladClient) -> list[str]:
+async def _balance_block(moysklad: MoySkladClient) -> str:
     balances: list[dict] | None = None
     try:
         balances = await moysklad.get_account_balances()
@@ -37,18 +38,19 @@ async def _get_balance_lines(moysklad: MoySkladClient) -> list[str]:
         logger.info("byaccount money report unavailable, falling back to manual sum")
 
     if balances:
-        lines = ["💼 Остаток по кассам/счетам:"]
-        for b in balances:
-            lines.append(f"• {b['name']}: {fmt(b['balance'])}")
-        lines.append(f"Итого остаток: {fmt(sum(b['balance'] for b in balances))}")
-        return lines
+        table = render_table(
+            ["Счёт", "Остаток"],
+            [[b["name"], fmt(b["balance"])] for b in balances],
+        )
+        total = fmt(sum(b["balance"] for b in balances))
+        return f"💼 Остаток по кассам/счетам:\n{table}\nИтого остаток: {total}"
 
     try:
         total = await moysklad.get_total_cash_balance_fallback()
-        return [f"💼 Остаток в кассе (по всем ордерам с начала учёта): {fmt(total)}"]
+        return f"💼 Остаток в кассе (по всем ордерам с начала учёта): {fmt(total)}"
     except MoySkladError:
         logger.exception("Failed to compute fallback cash balance")
-        return ["⚠️ Не удалось посчитать остаток в кассе."]
+        return "⚠️ Не удалось посчитать остаток в кассе."
 
 
 async def build_full_report_text(moysklad: MoySkladClient) -> str:
@@ -60,22 +62,23 @@ async def build_full_report_text(moysklad: MoySkladClient) -> str:
         logger.exception("Failed to fetch today's cashin/cashout")
         return "⚠️ Не получилось получить данные из МойСклад, попробуй позже."
 
-    lines = [
-        "📊 Отчёт по кассе",
-        "",
-        f"Доход за сегодня: {fmt(income)}",
-        f"Расход за сегодня: {fmt(expense)}",
-        f"Итог за сегодня: {fmt(income - expense)}",
-        "",
-        *(await _get_balance_lines(moysklad)),
-    ]
-    return "\n".join(lines)
+    today_table = render_table(
+        ["Сегодня", "Сумма"],
+        [
+            ["Доход", fmt(income)],
+            ["Расход", fmt(expense)],
+            ["Итог", fmt(income - expense)],
+        ],
+    )
+
+    return (
+        f"📊 Отчёт по кассе\n\n{today_table}\n\n{await _balance_block(moysklad)}"
+    )
 
 
 async def build_balance_only_text(moysklad: MoySkladClient) -> str:
     """Just the cash balance — for regular employees, no income/expense figures."""
-    lines = ["📊 Остаток кассы", "", *(await _get_balance_lines(moysklad))]
-    return "\n".join(lines)
+    return f"📊 Остаток кассы\n\n{await _balance_block(moysklad)}"
 
 
 async def build_period_report_text(moysklad: MoySkladClient, period_key: str) -> str:
@@ -93,34 +96,36 @@ async def build_period_report_text(moysklad: MoySkladClient, period_key: str) ->
     total_income = sum(d["income"] for d in daily.values())
     total_expense = sum(d["expense"] for d in daily.values())
 
-    lines = [f"📅 Отчёт {title}", ""]
-
     if days <= 92:
-        for day in sorted(daily):
-            d = daily[day]
-            day_label = day[8:10] + "." + day[5:7]
-            lines.append(f"{day_label}: доход {fmt(d['income'])} / расход {fmt(d['expense'])}")
-        if not daily:
-            lines.append("(пока нет записей за этот период)")
+        rows = [
+            [day[8:10] + "." + day[5:7], fmt(daily[day]["income"]), fmt(daily[day]["expense"])]
+            for day in sorted(daily)
+        ]
+        table_headers = ["Дата", "Доход", "Расход"]
     else:
         monthly: dict[str, dict[str, float]] = defaultdict(lambda: {"income": 0.0, "expense": 0.0})
         for day, d in daily.items():
             month_key = day[:7]
             monthly[month_key]["income"] += d["income"]
             monthly[month_key]["expense"] += d["expense"]
-        for month_key in sorted(monthly):
-            m = monthly[month_key]
-            lines.append(f"{month_key}: доход {fmt(m['income'])} / расход {fmt(m['expense'])}")
-        if not monthly:
-            lines.append("(пока нет записей за этот период)")
+        rows = [
+            [month_key, fmt(monthly[month_key]["income"]), fmt(monthly[month_key]["expense"])]
+            for month_key in sorted(monthly)
+        ]
+        table_headers = ["Месяц", "Доход", "Расход"]
 
-    lines += [
-        "",
-        f"Итого доход: {fmt(total_income)}",
-        f"Итого расход: {fmt(total_expense)}",
-        f"Итого прибыль: {fmt(total_income - total_expense)}",
-    ]
-    return "\n".join(lines)
+    body = render_table(table_headers, rows) if rows else "(пока нет записей за этот период)"
+
+    totals = render_table(
+        ["Итого", "Сумма"],
+        [
+            ["Доход", fmt(total_income)],
+            ["Расход", fmt(total_expense)],
+            ["Прибыль", fmt(total_income - total_expense)],
+        ],
+    )
+
+    return f"📅 Отчёт {title}\n\n{body}\n\n{totals}"
 
 
 async def build_stock_text(moysklad: MoySkladClient) -> str:
@@ -139,13 +144,17 @@ async def build_stock_text(moysklad: MoySkladClient) -> str:
     for item in stock:
         by_folder[item["folder"]].append(item)
 
-    lines = ["📦 Остатки на складе:"]
+    blocks = ["📦 Остатки на складе:"]
     for folder in sorted(by_folder):
-        lines.append("")
-        lines.append(f"— {folder} —")
-        for item in sorted(by_folder[folder], key=lambda r: r["name"]):
-            lines.append(f"• {item['name']}: {item['stock']:g}")
-    return "\n".join(lines)
+        table = render_table(
+            ["Товар", "Остаток"],
+            [
+                [item["name"], f"{item['stock']:g}"]
+                for item in sorted(by_folder[folder], key=lambda r: r["name"])
+            ],
+        )
+        blocks.append(f"— {folder} —\n{table}")
+    return "\n\n".join(blocks)
 
 
 async def build_debts_text(moysklad: MoySkladClient) -> str:
@@ -162,17 +171,20 @@ async def build_debts_text(moysklad: MoySkladClient) -> str:
     they_owe = [d for d in debts if d["balance"] > 0]
     we_owe = [d for d in debts if d["balance"] < 0]
 
-    lines = ["📈 Задолженность контрагентов:", ""]
+    blocks = ["📈 Задолженность контрагентов:"]
     if they_owe:
-        lines.append("Нам должны:")
-        for d in sorted(they_owe, key=lambda r: -r["balance"]):
-            lines.append(f"• {d['name']}: {fmt(d['balance'])}")
-        lines.append("")
+        table = render_table(
+            ["Нам должны", "Сумма"],
+            [[d["name"], fmt(d["balance"])] for d in sorted(they_owe, key=lambda r: -r["balance"])],
+        )
+        blocks.append(table)
     if we_owe:
-        lines.append("Мы должны:")
-        for d in sorted(we_owe, key=lambda r: r["balance"]):
-            lines.append(f"• {d['name']}: {fmt(-d['balance'])}")
-    return "\n".join(lines).strip()
+        table = render_table(
+            ["Мы должны", "Сумма"],
+            [[d["name"], fmt(-d["balance"])] for d in sorted(we_owe, key=lambda r: r["balance"])],
+        )
+        blocks.append(table)
+    return "\n\n".join(blocks)
 
 
 async def build_counterparty_report_text(
@@ -196,31 +208,31 @@ async def build_counterparty_report_text(
         logger.exception("Failed to build counterparty report")
         return "⚠️ Не получилось получить данные из МойСклад, попробуй позже."
 
-    lines = [
-        entry["name"],
-        "",
-        f"За сегодня: {fmt(today_data['total'])}",
-        f"Всего ({period_label}): {fmt(period_data['total'])}",
-    ]
+    summary = render_table(
+        ["Период", "Сумма"],
+        [
+            ["Сегодня", fmt(today_data["total"])],
+            [period_label, fmt(period_data["total"])],
+        ],
+    )
+
+    result = f"{entry['name']}\n\n{summary}"
 
     daily = period_data["daily"]
     if daily:
         span_days = (now - period_start).days
-        lines.append("")
         if span_days <= 92:
-            lines.append("По дням:")
-            for day in sorted(daily):
-                day_label = day[8:10] + "." + day[5:7]
-                lines.append(f"{day_label}: {fmt(daily[day])}")
+            rows = [[day[8:10] + "." + day[5:7], fmt(daily[day])] for day in sorted(daily)]
+            table = render_table(["Дата", "Сумма"], rows)
         else:
             monthly: dict[str, float] = defaultdict(float)
             for day, amount in daily.items():
                 monthly[day[:7]] += amount
-            lines.append("По месяцам:")
-            for month_key in sorted(monthly):
-                lines.append(f"{month_key}: {fmt(monthly[month_key])}")
+            rows = [[month_key, fmt(monthly[month_key])] for month_key in sorted(monthly)]
+            table = render_table(["Месяц", "Сумма"], rows)
+        result += f"\n\n{table}"
 
-    return "\n".join(lines)
+    return result
 
 
 async def send_balance_report(message: Message, moysklad: MoySkladClient, config: Config) -> None:

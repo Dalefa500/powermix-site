@@ -9,13 +9,12 @@ BTN_STOCK = "📦 Остатки"
 BTN_DEBTS = "📈 Долги"
 BTN_COUNTERPARTIES = "👥 Команда"
 
+# Расход/Доход/Долги are temporarily hidden from the menu (still fully
+# wired up in code — just add them back here when needed).
 NAV_BUTTONS = (
-    BTN_EXPENSE,
-    BTN_INCOME,
     BTN_BALANCE,
     BTN_REPORT,
     BTN_STOCK,
-    BTN_DEBTS,
     BTN_COUNTERPARTIES,
 )
 
@@ -36,7 +35,7 @@ def main_reply_kb() -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     for text in NAV_BUTTONS:
         builder.button(text=text)
-    builder.adjust(2, 2, 2, 1)
+    builder.adjust(2, 2)
     return builder.as_markup(resize_keyboard=True)
 
 
