@@ -14,7 +14,8 @@ from ..config import Config
 from ..keyboards import PERIOD_LABELS, period_choice_kb
 from ..moysklad import MoySkladClient, MoySkladError
 
-COUNTERPARTY_LOOKBACK_DAYS = 365 * 5
+COUNTERPARTY_LOOKBACK_DAYS = 365
+COUNTERPARTY_LOOKBACK_LABEL = "последний год"
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +204,7 @@ async def build_counterparty_report_text(moysklad: MoySkladClient, entry: dict) 
         "",
         f"За сегодня: {today_data['total']:.2f}",
         f"За этот месяц: {month_data['total']:.2f}",
-        f"Всего (последние 5 лет): {entry['total']:.2f}",
+        f"Всего ({COUNTERPARTY_LOOKBACK_LABEL}): {entry['total']:.2f}",
     ]
 
     if month_data["daily"]:
@@ -236,6 +237,8 @@ async def send_period_choice(message: Message) -> None:
 async def send_counterparty_choice(
     message: Message, state: FSMContext, moysklad: MoySkladClient
 ) -> None:
+    await message.answer(f"⏳ Считаю расход по контрагентам за {COUNTERPARTY_LOOKBACK_LABEL}...")
+
     now = datetime.now()
     start = now - timedelta(days=COUNTERPARTY_LOOKBACK_DAYS)
     try:
