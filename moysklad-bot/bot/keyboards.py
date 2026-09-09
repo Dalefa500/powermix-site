@@ -3,11 +3,12 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 BTN_EXPENSE = "💸 Расход"
 BTN_INCOME = "💰 Доход"
-BTN_SHIPMENT = "📦 Отгрузка"
-BTN_OTHER = "🧾 Прочий расход"
 BTN_BALANCE = "📊 Баланс"
+BTN_MONTH = "📅 За месяц"
+BTN_STOCK = "📦 Остатки"
+BTN_DEBTS = "📈 Долги"
 
-NAV_BUTTONS = (BTN_EXPENSE, BTN_INCOME, BTN_SHIPMENT, BTN_OTHER, BTN_BALANCE)
+NAV_BUTTONS = (BTN_EXPENSE, BTN_INCOME, BTN_BALANCE, BTN_MONTH, BTN_STOCK, BTN_DEBTS)
 
 
 def main_reply_kb() -> ReplyKeyboardMarkup:
@@ -16,16 +17,8 @@ def main_reply_kb() -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     for text in NAV_BUTTONS:
         builder.button(text=text)
-    builder.adjust(2, 2, 1)
+    builder.adjust(2, 2, 2)
     return builder.as_markup(resize_keyboard=True)
-
-
-def confirm_kb(yes_data: str, no_data: str) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Да", callback_data=yes_data)
-    builder.button(text="❌ Нет", callback_data=no_data)
-    builder.adjust(2)
-    return builder.as_markup()
 
 
 def cancel_kb() -> InlineKeyboardMarkup:

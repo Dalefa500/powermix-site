@@ -1,3 +1,3 @@
-from . import cash, report, shipment, start
+from . import cash, report, start
 
-routers = [start.router, cash.router, shipment.router, report.router]
+routers = [start.router, cash.router, report.router]

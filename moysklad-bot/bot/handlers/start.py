@@ -4,15 +4,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from ..config import Config
-from ..keyboards import BTN_BALANCE, BTN_SHIPMENT, main_reply_kb
+from ..keyboards import BTN_BALANCE, BTN_DEBTS, BTN_MONTH, BTN_STOCK, main_reply_kb
 from ..moysklad import MoySkladClient
 from .cash import TEXT_TO_KIND, enter_cash_flow
-from .report import send_balance_report
-from .shipment import enter_shipment_flow
+from .report import send_balance_report, send_debts_report, send_month_report, send_stock_report
 
 # This router is included first (see handlers/__init__.py), so its
 # StateFilter("*") navigation handlers below always get first look at every
-# message — a menu tap wins even if the employee was mid-way through typing
+# message — a menu tap wins even if the user was mid-way through typing
 # something in another flow, instead of being swallowed by that flow's step
 # handler.
 router = Router(name="start")
@@ -36,18 +35,30 @@ async def nav_cash(message: Message, state: FSMContext) -> None:
     await enter_cash_flow(message, state, TEXT_TO_KIND[message.text])
 
 
-@router.message(StateFilter("*"), F.text == BTN_SHIPMENT)
-async def nav_shipment(message: Message, state: FSMContext) -> None:
-    await state.clear()
-    await enter_shipment_flow(message, state)
-
-
 @router.message(StateFilter("*"), F.text == BTN_BALANCE)
 async def nav_balance(
     message: Message, state: FSMContext, moysklad: MoySkladClient, config: Config
 ) -> None:
     await state.clear()
     await send_balance_report(message, moysklad, config)
+
+
+@router.message(StateFilter("*"), F.text == BTN_MONTH)
+async def nav_month(message: Message, state: FSMContext, moysklad: MoySkladClient) -> None:
+    await state.clear()
+    await send_month_report(message, moysklad)
+
+
+@router.message(StateFilter("*"), F.text == BTN_STOCK)
+async def nav_stock(message: Message, state: FSMContext, moysklad: MoySkladClient) -> None:
+    await state.clear()
+    await send_stock_report(message, moysklad)
+
+
+@router.message(StateFilter("*"), F.text == BTN_DEBTS)
+async def nav_debts(message: Message, state: FSMContext, moysklad: MoySkladClient) -> None:
+    await state.clear()
+    await send_debts_report(message, moysklad)
 
 
 @router.callback_query(F.data == "cancel")

@@ -88,6 +88,9 @@ async def main() -> None:
         [
             BotCommand(command="start", description="Открыть меню"),
             BotCommand(command="balance", description="Показать баланс/кассу"),
+            BotCommand(command="month", description="Доход/расход по дням за месяц"),
+            BotCommand(command="stock", description="Остатки на складе"),
+            BotCommand(command="debts", description="Задолженность контрагентов"),
         ]
     )
     dp = Dispatcher(storage=MemoryStorage())

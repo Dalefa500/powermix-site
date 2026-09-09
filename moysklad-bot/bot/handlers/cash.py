@@ -6,7 +6,7 @@ from aiogram import Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from ..keyboards import BTN_EXPENSE, BTN_INCOME, BTN_OTHER, cancel_kb, main_reply_kb
+from ..keyboards import BTN_EXPENSE, BTN_INCOME, cancel_kb, main_reply_kb
 from ..moysklad import MoySkladClient, MoySkladError
 from ..states import CashForm
 
@@ -21,13 +21,11 @@ router = Router(name="cash")
 KIND_LABELS = {
     "expense": "Расход",
     "income": "Доход",
-    "other": "Прочий расход",
 }
 
 TEXT_TO_KIND = {
     BTN_EXPENSE: "expense",
     BTN_INCOME: "income",
-    BTN_OTHER: "other",
 }
 
 
@@ -53,7 +51,7 @@ async def cash_sum_entered(message: Message, state: FSMContext) -> None:
 
     await state.update_data(amount=amount)
     await state.set_state(CashForm.waiting_for_comment)
-    await message.answer("Коротко опиши, за что (например: «бензин для доставки»):")
+    await message.answer("Коротко опиши, за что (например: «аренда за сентябрь»):")
 
 
 @router.message(CashForm.waiting_for_comment)
@@ -72,8 +70,7 @@ async def cash_comment_entered(
         if kind == "income":
             await moysklad.create_cash_in(amount, comment, employee)
         else:
-            label = "Прочее" if kind == "other" else "Расход"
-            await moysklad.create_cash_out(amount, f"[{label}] {comment}", employee)
+            await moysklad.create_cash_out(amount, comment, employee)
     except MoySkladError:
         logger.exception("Failed to create cash document in MoySklad")
         await message.answer(

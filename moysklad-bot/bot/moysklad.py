@@ -97,12 +97,6 @@ class MoySkladClient:
     async def create_counterparty(self, name: str) -> dict:
         return await self._request("POST", "/entity/counterparty", json={"name": name})
 
-    async def search_products(self, name: str, limit: int = 8) -> list[dict]:
-        data = await self._request(
-            "GET", "/entity/product", params={"search": name, "limit": limit}
-        )
-        return data.get("rows", [])
-
     async def create_cash_in(self, sum_rub: float, comment: str, employee: str) -> dict:
         organization_href = await self.get_default_organization_href()
         agent_href = await self.get_default_agent_href()
@@ -124,25 +118,6 @@ class MoySkladClient:
             "description": f"{comment}\n\nВнёс: {employee} (через Telegram-бота)",
         }
         return await self._request("POST", "/entity/cashout", json=payload)
-
-    async def create_demand(
-        self,
-        counterparty_href: str,
-        positions: list[dict],
-        employee: str,
-        comment: str = "",
-    ) -> dict:
-        organization_href = await self.get_default_organization_href()
-        store_href = await self.get_default_store_href()
-        description = f"{comment}\n\nОформил: {employee} (через Telegram-бота)".strip()
-        payload = {
-            "organization": self._meta(organization_href, "organization"),
-            "store": self._meta(store_href, "store"),
-            "agent": self._meta(counterparty_href, "counterparty"),
-            "description": description,
-            "positions": positions,
-        }
-        return await self._request("POST", "/entity/demand", json=payload)
 
     async def sum_cash_today(self, entity: str) -> float:
         today = datetime.now().strftime("%Y-%m-%d")
@@ -199,3 +174,74 @@ class MoySkladClient:
                     break
                 offset += limit
         return total
+
+    async def get_stock_report(self, limit: int = 100) -> list[dict]:
+        """Current stock quantity per product/material (/report/stock/all)."""
+        data = await self._request("GET", "/report/stock/all", params={"limit": limit})
+        rows = data.get("rows") if isinstance(data, dict) else data
+        if not isinstance(rows, list):
+            raise MoySkladError("Неожиданный формат ответа /report/stock/all")
+        return [
+            {
+                "name": row.get("name", "?"),
+                "stock": row.get("stock", 0),
+                "reserve": row.get("reserve", 0),
+            }
+            for row in rows
+        ]
+
+    async def get_counterparty_debts(self, limit: int = 30) -> list[dict]:
+        """Outstanding balance per counterparty (/report/counterparty).
+
+        Positive balance = the counterparty owes us; negative = we owe them.
+        This endpoint is less commonly used than /report/money and /report/stock
+        — treat the first live call as a test and adjust if the account
+        returns an unexpected shape.
+        """
+        data = await self._request("GET", "/report/counterparty", params={"limit": limit})
+        rows = data.get("rows") if isinstance(data, dict) else data
+        if not isinstance(rows, list):
+            raise MoySkladError("Неожиданный формат ответа /report/counterparty")
+
+        debts = []
+        for row in rows:
+            balance = row.get("balance", 0) / 100
+            if abs(balance) < 0.01:
+                continue
+            debts.append({"name": row.get("name", "?"), "balance": balance})
+        return debts
+
+    async def get_daily_cash_summary(
+        self, start: datetime, end: datetime
+    ) -> dict[str, dict[str, float]]:
+        """Per-day income/expense totals for cashin/cashout between start and
+        end (inclusive), keyed by 'YYYY-MM-DD'.
+        """
+        daily: dict[str, dict[str, float]] = {}
+        for entity, key in (("cashin", "income"), ("cashout", "expense")):
+            offset = 0
+            limit = 1000
+            while True:
+                data = await self._request(
+                    "GET",
+                    f"/entity/{entity}",
+                    params={
+                        "filter": (
+                            f"moment>={start.strftime('%Y-%m-%d')} 00:00:00;"
+                            f"moment<={end.strftime('%Y-%m-%d')} 23:59:59"
+                        ),
+                        "limit": limit,
+                        "offset": offset,
+                    },
+                )
+                rows = data.get("rows", [])
+                for row in rows:
+                    day = (row.get("moment") or "")[:10]
+                    if not day:
+                        continue
+                    daily.setdefault(day, {"income": 0.0, "expense": 0.0})
+                    daily[day][key] += row.get("sum", 0) / 100
+                if len(rows) < limit:
+                    break
+                offset += limit
+        return daily
