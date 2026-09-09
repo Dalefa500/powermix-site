@@ -37,10 +37,10 @@ def main_reply_kb() -> ReplyKeyboardMarkup:
     return builder.as_markup(resize_keyboard=True)
 
 
-def period_choice_kb() -> InlineKeyboardMarkup:
+def period_choice_kb(prefix: str = "period") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for period, label in PERIOD_LABELS.items():
-        builder.button(text=label, callback_data=f"period:{period}")
+        builder.button(text=label, callback_data=f"{prefix}:{period}")
     builder.adjust(4)
     return builder.as_markup()
 

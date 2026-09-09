@@ -9,7 +9,7 @@ from ..moysklad import MoySkladClient
 from .cash import TEXT_TO_KIND, enter_cash_flow
 from .report import (
     send_balance_report,
-    send_counterparty_choice,
+    send_counterparty_period_choice,
     send_debts_report,
     send_period_choice,
     send_stock_report,
@@ -68,11 +68,9 @@ async def nav_debts(message: Message, state: FSMContext, moysklad: MoySkladClien
 
 
 @router.message(StateFilter("*"), F.text == BTN_COUNTERPARTIES)
-async def nav_counterparties(
-    message: Message, state: FSMContext, moysklad: MoySkladClient
-) -> None:
+async def nav_counterparties(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await send_counterparty_choice(message, state, moysklad)
+    await send_counterparty_period_choice(message)
 
 
 @router.callback_query(F.data == "cancel")

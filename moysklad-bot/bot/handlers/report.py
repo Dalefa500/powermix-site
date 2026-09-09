@@ -15,9 +15,6 @@ from ..currency import fmt
 from ..keyboards import PERIOD_LABELS, period_choice_kb
 from ..moysklad import MoySkladClient, MoySkladError
 
-COUNTERPARTY_LOOKBACK_DAYS = 365
-COUNTERPARTY_LOOKBACK_LABEL = "последний год"
-
 logger = logging.getLogger(__name__)
 
 router = Router(name="report")
@@ -179,7 +176,9 @@ async def build_debts_text(moysklad: MoySkladClient) -> str:
     return "\n".join(lines).strip()
 
 
-async def build_counterparty_report_text(moysklad: MoySkladClient, entry: dict) -> str:
+async def build_counterparty_report_text(
+    moysklad: MoySkladClient, entry: dict, period_label: str
+) -> str:
     """Total / this-month / today expense for one counterparty, plus a
     day-by-day breakdown for the current month — exactly what you'd want to
     know about how much money went to one specific person or category
@@ -205,7 +204,7 @@ async def build_counterparty_report_text(moysklad: MoySkladClient, entry: dict) 
         "",
         f"За сегодня: {fmt(today_data['total'])}",
         f"За этот месяц: {fmt(month_data['total'])}",
-        f"Всего ({COUNTERPARTY_LOOKBACK_LABEL}): {fmt(entry['total'])}",
+        f"Всего ({period_label}): {fmt(entry['total'])}",
     ]
 
     if month_data["daily"]:
@@ -235,33 +234,41 @@ async def send_period_choice(message: Message) -> None:
     await message.answer("За какой период показать отчёт?", reply_markup=period_choice_kb())
 
 
-async def send_counterparty_choice(
-    message: Message, state: FSMContext, moysklad: MoySkladClient
-) -> None:
-    await message.answer(f"⏳ Считаю расход по контрагентам за {COUNTERPARTY_LOOKBACK_LABEL}...")
+async def send_counterparty_period_choice(message: Message) -> None:
+    await message.answer(
+        "За какой период показать расход по контрагентам?",
+        reply_markup=period_choice_kb("cpperiod"),
+    )
 
+
+async def _show_counterparty_list(
+    edit_target: Message, state: FSMContext, moysklad: MoySkladClient, period: str
+) -> None:
     now = datetime.now()
-    start = now - timedelta(days=COUNTERPARTY_LOOKBACK_DAYS)
+    start, title = _period_start(period, now)
+
+    await edit_target.edit_text(f"⏳ Считаю расход по контрагентам {title}...")
+
     try:
         top = await moysklad.get_expense_by_counterparty(start, now)
     except MoySkladError:
         logger.exception("Failed to fetch counterparty list")
-        await message.answer("⚠️ Не получилось получить данные из МойСклад, попробуй позже.")
+        await edit_target.edit_text("⚠️ Не получилось получить данные из МойСклад, попробуй позже.")
         return
 
     if not top:
-        await message.answer("Пока нет расходов, привязанных к контрагенту.")
+        await edit_target.edit_text(f"Нет расходов, привязанных к контрагенту, {title}.")
         return
 
-    await state.update_data(cp_choices=top)
+    await state.update_data(cp_choices=top, cp_period_label=title)
     builder = InlineKeyboardBuilder()
     for i, entry in enumerate(top):
         builder.button(
             text=f"{entry['name']} — {entry['total']:.0f} с.", callback_data=f"cpexp:{i}"
         )
     builder.adjust(1)
-    await message.answer(
-        "По какому контрагенту показать расход по дням/месяцам?",
+    await edit_target.edit_text(
+        f"Контрагенты {title}. По какому показать расход по дням?",
         reply_markup=builder.as_markup(),
     )
 
@@ -295,8 +302,8 @@ async def debts_report(message: Message, moysklad: MoySkladClient) -> None:
 
 
 @router.message(Command("counterparties"))
-async def counterparties_command(message: Message, state: FSMContext, moysklad: MoySkladClient) -> None:
-    await send_counterparty_choice(message, state, moysklad)
+async def counterparties_command(message: Message) -> None:
+    await send_counterparty_period_choice(message)
 
 
 @router.callback_query(F.data.startswith("period:"))
@@ -310,6 +317,18 @@ async def period_chosen(callback: CallbackQuery, moysklad: MoySkladClient) -> No
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("cpperiod:"))
+async def counterparty_period_chosen(
+    callback: CallbackQuery, state: FSMContext, moysklad: MoySkladClient
+) -> None:
+    period = callback.data.split(":", 1)[1]
+    if period not in PERIOD_LABELS:
+        await callback.answer("Неизвестный период", show_alert=True)
+        return
+    await callback.answer()
+    await _show_counterparty_list(callback.message, state, moysklad, period)
+
+
 @router.callback_query(F.data.startswith("cpexp:"))
 async def counterparty_chosen(
     callback: CallbackQuery, state: FSMContext, moysklad: MoySkladClient
@@ -317,9 +336,10 @@ async def counterparty_chosen(
     index = int(callback.data.split(":", 1)[1])
     data = await state.get_data()
     choices: list[dict] = data.get("cp_choices", [])
+    period_label = data.get("cp_period_label", "за выбранный период")
     if index >= len(choices):
         await callback.answer("Список устарел, открой «Контрагенты» заново", show_alert=True)
         return
-    text = await build_counterparty_report_text(moysklad, choices[index])
+    text = await build_counterparty_report_text(moysklad, choices[index], period_label)
     await callback.message.edit_text(text)
     await callback.answer()
