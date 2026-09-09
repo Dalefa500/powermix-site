@@ -12,7 +12,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..config import Config
 from ..currency import fmt
-from ..keyboards import CP_PERIOD_DAYS, PERIOD_LABELS, cp_period_choice_kb, period_choice_kb
+from ..keyboards import CP_PERIOD_DAYS, cp_period_choice_kb
 from ..moysklad import MoySkladClient, MoySkladError
 
 # Only these counterparties matter for the "Команда" report — everyone
@@ -22,8 +22,6 @@ from ..moysklad import MoySkladClient, MoySkladError
 TRACKED_COUNTERPARTIES = {
     "Дивиденды": "💼 Инвестор (вы)",
     "Сулаймоншоев Убайд": "👔 Убайд — директор",
-    "Фозил": "🧮 Фозил — бухгалтер",
-    "Файзов Дилшод": "💵 Дилшод — кассир",
 }
 
 logger = logging.getLogger(__name__)
@@ -80,21 +78,11 @@ async def build_balance_only_text(moysklad: MoySkladClient) -> str:
     return "\n".join(lines)
 
 
-def _period_start(period: str, now: datetime) -> tuple[datetime, str]:
-    if period == "day":
-        return now.replace(hour=0, minute=0, second=0, microsecond=0), f"за {now.strftime('%d.%m.%Y')}"
-    if period == "month":
-        return now.replace(day=1), f"за {now.strftime('%B %Y')}"
-    if period == "half":
-        return now - timedelta(days=182), "за полгода"
-    if period == "year":
-        return now - timedelta(days=365), "за год"
-    raise ValueError(f"Unknown period: {period}")
-
-
-async def build_period_report_text(moysklad: MoySkladClient, period: str) -> str:
+async def build_period_report_text(moysklad: MoySkladClient, period_key: str) -> str:
     now = datetime.now()
-    start, title = _period_start(period, now)
+    label, days = CP_PERIOD_DAYS[period_key]
+    start = now - timedelta(days=days)
+    title = f"за {label.lower()}"
 
     try:
         daily = await moysklad.get_daily_cash_summary(start, now)
@@ -107,7 +95,7 @@ async def build_period_report_text(moysklad: MoySkladClient, period: str) -> str
 
     lines = [f"📅 Отчёт {title}", ""]
 
-    if period in ("day", "month"):
+    if days <= 92:
         for day in sorted(daily):
             d = daily[day]
             day_label = day[8:10] + "." + day[5:7]
@@ -249,7 +237,9 @@ async def send_balance_report(message: Message, moysklad: MoySkladClient, config
 
 
 async def send_period_choice(message: Message) -> None:
-    await message.answer("За какой период показать отчёт?", reply_markup=period_choice_kb())
+    await message.answer(
+        "За какой период показать отчёт?", reply_markup=cp_period_choice_kb("period")
+    )
 
 
 async def send_counterparty_period_choice(message: Message) -> None:
@@ -328,11 +318,11 @@ async def counterparties_command(message: Message) -> None:
 
 @router.callback_query(F.data.startswith("period:"))
 async def period_chosen(callback: CallbackQuery, moysklad: MoySkladClient) -> None:
-    period = callback.data.split(":", 1)[1]
-    if period not in PERIOD_LABELS:
+    period_key = callback.data.split(":", 1)[1]
+    if period_key not in CP_PERIOD_DAYS:
         await callback.answer("Неизвестный период", show_alert=True)
         return
-    text = await build_period_report_text(moysklad, period)
+    text = await build_period_report_text(moysklad, period_key)
     await callback.message.edit_text(text)
     await callback.answer()
 
