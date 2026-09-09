@@ -58,8 +58,17 @@ svg { display: block; }
     #1e1c1b;
 }
 .login__inner { width: 100%; max-width: 330px; text-align: center; color: var(--ink); }
-.login__logo { width: 232px; height: auto; margin: 0 auto 22px; }
-.login__logo--light { display: none; }
+/* Логотип используется ровно как в исходнике — чёрный «PROFIX» на белом,
+   поэтому на тёмном фоне он лежит на белой подложке, а не перекрашивается. */
+.login__plate {
+  display: inline-block;
+  background: #fff;
+  border-radius: 20px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .9);
+}
+.login__logo { width: 224px; height: auto; display: block; }
 .login__sub { color: var(--ink-3); font-size: 14.5px; margin-bottom: 26px; }
 .login__form { display: grid; gap: 12px; }
 .pin {
