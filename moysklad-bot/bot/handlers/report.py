@@ -14,7 +14,7 @@ from ..config import Config
 from ..currency import fmt
 from ..keyboards import CP_PERIOD_DAYS, cp_period_choice_kb
 from ..moysklad import MoySkladClient, MoySkladError
-from ..tables import render_table
+from ..tables import render_table, render_table_chunks
 
 # Only these counterparties matter for the "Команда" report — everyone
 # else is noise for this view (there are dozens of expense categories in
@@ -128,17 +128,24 @@ async def build_period_report_text(moysklad: MoySkladClient, period_key: str) ->
     return f"📅 Отчёт {title}\n\n{body}\n\n{totals}"
 
 
-async def build_stock_text(moysklad: MoySkladClient) -> str:
+async def build_stock_blocks(moysklad: MoySkladClient) -> list[str]:
     """Stock levels grouped by product folder (raw materials vs finished
-    goods, if the account keeps them in separate MoySklad folders)."""
+    goods, if the account keeps them in separate MoySklad folders).
+
+    Returns a list of ready-to-send message texts rather than one big
+    string — a long inventory (years of accumulated products) can easily
+    exceed Telegram's ~4096 character message limit, so each folder (and,
+    if a folder alone is too long, each chunk of it) becomes its own
+    message.
+    """
     try:
         stock = await moysklad.get_stock_report()
     except MoySkladError:
         logger.exception("Failed to fetch stock report")
-        return "⚠️ Не получилось получить остатки из МойСклад, попробуй позже."
+        return ["⚠️ Не получилось получить остатки из МойСклад, попробуй позже."]
 
     if not stock:
-        return "📦 Остатки пусты — в МойСклад нет товаров с остатком."
+        return ["📦 Остатки пусты — в МойСклад нет товаров с остатком."]
 
     by_folder: dict[str, list[dict]] = defaultdict(list)
     for item in stock:
@@ -146,15 +153,15 @@ async def build_stock_text(moysklad: MoySkladClient) -> str:
 
     blocks = ["📦 Остатки на складе:"]
     for folder in sorted(by_folder):
-        table = render_table(
-            ["Товар", "Остаток"],
-            [
-                [item["name"], f"{item['stock']:g}"]
-                for item in sorted(by_folder[folder], key=lambda r: r["name"])
-            ],
-        )
-        blocks.append(f"— {folder} —\n{table}")
-    return "\n\n".join(blocks)
+        rows = [
+            [item["name"], f"{item['stock']:g}"]
+            for item in sorted(by_folder[folder], key=lambda r: r["name"])
+        ]
+        tables = render_table_chunks(["Товар", "Остаток"], rows)
+        for i, table in enumerate(tables):
+            title = f"— {folder} —" if i == 0 else f"— {folder} (продолжение) —"
+            blocks.append(f"{title}\n{table}")
+    return blocks
 
 
 async def build_debts_text(moysklad: MoySkladClient) -> str:
@@ -296,7 +303,8 @@ async def _show_counterparty_list(
 
 
 async def send_stock_report(message: Message, moysklad: MoySkladClient) -> None:
-    await message.answer(await build_stock_text(moysklad))
+    for block in await build_stock_blocks(moysklad):
+        await message.answer(block)
 
 
 async def send_debts_report(message: Message, moysklad: MoySkladClient) -> None:
