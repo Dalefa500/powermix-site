@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Profix</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Profix">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f2f2">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0a0a">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<!-- ── Вход ─────────────────────────────────────────────── -->
+<section id="login" class="login">
+  <div class="login__inner">
+    <img class="login__logo login__logo--light" src="/icons/logo.png" alt="Profix">
+    <img class="login__logo login__logo--dark" src="/icons/logo-dark.png" alt="Profix">
+    <p class="login__sub">Панель руководителя</p>
+    <form id="login-form" class="login__form" autocomplete="off">
+      <input id="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]*"
+             placeholder="Код доступа" aria-label="Код доступа" enterkeyhint="go">
+      <button class="btn btn--primary" type="submit">Войти</button>
+      <p id="login-error" class="login__error" role="alert" hidden></p>
+    </form>
+  </div>
+</section>
+
+<!-- ── Приложение ───────────────────────────────────────── -->
+<div id="app" hidden>
+  <header class="topbar">
+    <button id="back" class="topbar__back" type="button" aria-label="Назад" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <h1 id="title" class="topbar__title">Баланс</h1>
+    <button id="refresh" class="topbar__action" type="button" aria-label="Обновить">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/>
+      </svg>
+    </button>
+  </header>
+
+  <main id="views">
+    <section class="view" data-view="balance"></section>
+    <section class="view" data-view="report" hidden></section>
+    <section class="view" data-view="stock" hidden></section>
+    <section class="view" data-view="team" hidden></section>
+  </main>
+
+  <nav class="tabbar" aria-label="Разделы">
+    <button class="tab is-active" data-tab="balance" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5.5A2.5 2.5 0 0 1 3 17.5z"/>
+        <path d="M16.5 12.5h.01"/>
+      </svg><span>Баланс</span>
+    </button>
+    <button class="tab" data-tab="report" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l4-5 3 3 4-6"/>
+      </svg><span>Отчёт</span>
+    </button>
+    <button class="tab" data-tab="stock" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 8.5L12 4 4 8.5v7L12 20l8-4.5z"/><path d="M4 8.5l8 4.5 8-4.5"/><path d="M12 13v7"/>
+      </svg><span>Остатки</span>
+    </button>
+    <button class="tab" data-tab="team" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
+        <path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M17 11.5a3 3 0 1 0 0-6"/>
+        <path d="M18 14.5a5.5 5.5 0 0 1 3.5 5.5"/>
+      </svg><span>Команда</span>
+    </button>
+  </nav>
+</div>
+
+<div id="tooltip" class="tooltip" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

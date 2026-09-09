@@ -1,18 +1,50 @@
+x-network-workarounds: &network-workarounds
+  sysctls:
+    # The host has IPv6 but Docker's bridge network doesn't route it, so
+    # outbound requests that try IPv6 first fail with "Network is
+    # unreachable" before falling back to IPv4. Disabling IPv6 inside the
+    # container skips straight to the working IPv4 path.
+    - net.ipv6.conf.all.disable_ipv6=1
+  extra_hosts:
+    # DNS hands this host an api.telegram.org IPv4 (149.154.166.110) that
+    # its network can't reach at all — TCP to :443 times out, while other
+    # Telegram addresses answer instantly. Pin the reachable one. Hostname
+    # (so TLS/SNI) is unchanged; drop this line if Telegram retires the IP.
+    - "api.telegram.org:149.154.167.220"
+
 services:
   moysklad-bot:
     build: .
     restart: unless-stopped
     env_file:
       - .env
-    sysctls:
-      # The host has IPv6 but Docker's bridge network doesn't route it, so
-      # outbound requests that try IPv6 first fail with "Network is
-      # unreachable" before falling back to IPv4. Disabling IPv6 inside the
-      # container skips straight to the working IPv4 path.
-      - net.ipv6.conf.all.disable_ipv6=1
-    extra_hosts:
-      # DNS hands this host an api.telegram.org IPv4 (149.154.166.110) that
-      # its network can't reach at all — TCP to :443 times out, while other
-      # Telegram addresses answer instantly. Pin the reachable one. Hostname
-      # (so TLS/SNI) is unchanged; drop this line if Telegram retires the IP.
-      - "api.telegram.org:149.154.167.220"
+    <<: *network-workarounds
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: >
+      uvicorn web.main:app --host 0.0.0.0 --port 8000
+      --proxy-headers --forwarded-allow-ips=*
+    env_file:
+      - .env
+    <<: *network-workarounds
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+
+volumes:
+  caddy-data:
+  caddy-config:

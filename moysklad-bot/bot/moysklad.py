@@ -280,17 +280,12 @@ class MoySkladClient:
                 daily[day][key] += row.get("sum", 0) / 100
         return daily
 
-    async def get_named_counterparty_expenses(
-        self, names: dict[str, str], start: datetime, end: datetime
-    ) -> list[dict]:
-        """Expense totals for a fixed, known list of counterparties, keyed
-        by the search term used to find them in MoySklad with the display
-        label to show instead (e.g. {"Дивиденды": "💼 Инвестор (вы)"}).
-        Resolved once via search then queried directly with a server-side
-        agent filter — far cheaper than scanning every cashout row in the
-        period when you only care about a handful of people.
+    async def resolve_tracked_agents(self, names: dict[str, str]) -> list[dict]:
+        """Resolve a fixed list of counterparties, keyed by the search term
+        used to find them in MoySklad with the display label to show
+        instead (e.g. {"Дивиденды": "💼 Инвестор (вы)"}).
         """
-        results: list[dict] = []
+        resolved: list[dict] = []
         seen_hrefs: set[str] = set()
         for search_name, display_label in names.items():
             candidates = await self.search_counterparty(search_name, limit=5)
@@ -299,14 +294,27 @@ class MoySkladClient:
                 if href in seen_hrefs:
                     continue
                 seen_hrefs.add(href)
-                breakdown = await self.get_counterparty_expense_breakdown(href, start, end)
                 # If the search term is broad enough to match more than one
                 # real counterparty, keep the actual МойСклад name visible
                 # too so they don't get silently conflated under one label.
                 label = display_label
                 if len(candidates) > 1:
                     label = f"{display_label} ({candidate.get('name', search_name)})"
-                results.append({"name": label, "href": href, "total": breakdown["total"]})
+                resolved.append({"name": label, "href": href})
+        return resolved
+
+    async def get_named_counterparty_expenses(
+        self, names: dict[str, str], start: datetime, end: datetime
+    ) -> list[dict]:
+        """Expense totals for a fixed, known list of counterparties.
+        Resolved once via search then queried directly with a server-side
+        agent filter — far cheaper than scanning every cashout row in the
+        period when you only care about a handful of people.
+        """
+        results: list[dict] = []
+        for entry in await self.resolve_tracked_agents(names):
+            breakdown = await self.get_counterparty_expense_breakdown(entry["href"], start, end)
+            results.append({**entry, "total": breakdown["total"]})
         return sorted(results, key=lambda e: -e["total"])
 
     async def get_counterparty_expense_breakdown(

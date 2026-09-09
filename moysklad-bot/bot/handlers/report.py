@@ -14,16 +14,8 @@ from ..config import Config
 from ..currency import fmt
 from ..keyboards import CP_PERIOD_DAYS, cp_period_choice_kb
 from ..moysklad import MoySkladClient, MoySkladError
+from ..people import TRACKED_COUNTERPARTIES
 from ..tables import render_table, render_table_chunks
-
-# Only these counterparties matter for the "Команда" report — everyone
-# else is noise for this view (there are dozens of expense categories in
-# the account's 5-year history). Keyed by the MoySklad search term, valued
-# by the role label to actually show in the bot.
-TRACKED_COUNTERPARTIES = {
-    "Дивиденды": "💼 Инвестор (вы)",
-    "Сулаймоншоев Убайд": "👔 Убайд — директор",
-}
 
 logger = logging.getLogger(__name__)
 
