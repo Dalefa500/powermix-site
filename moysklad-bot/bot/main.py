@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import logging
+import socket
 from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware, Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, TelegramObject, Update
@@ -18,6 +20,18 @@ from .moysklad import MoySkladClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class Ipv4OnlySession(AiohttpSession):
+    """Some hosts hand containers a dual-stack DNS answer for
+    api.telegram.org but no working outbound IPv6 route, so aiohttp's
+    connector stalls trying the IPv6 candidate first. Forcing IPv4-only
+    skips that dead end.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._connector_init["family"] = socket.AF_INET
 
 
 class AccessControlMiddleware(BaseMiddleware):
@@ -83,7 +97,11 @@ async def daily_report_loop(bot: Bot, moysklad: MoySkladClient, config: Config) 
 
 async def main() -> None:
     config = load_config()
-    bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(
+        token=config.bot_token,
+        session=Ipv4OnlySession(),
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
     await bot.set_my_commands(
         [
             BotCommand(command="start", description="Открыть меню"),

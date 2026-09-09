@@ -33,6 +33,11 @@ class MoySkladClient:
                 "Content-Type": "application/json",
             },
             timeout=20.0,
+            # Some hosts hand containers a dual-stack DNS answer but no
+            # working outbound IPv6 route, which stalls every request while
+            # it tries (and fails) the IPv6 candidate first. Binding to the
+            # IPv4 wildcard address forces IPv4-only connections.
+            local_address="0.0.0.0",
         )
         self._organization_href: str | None = None
         self._store_href: str | None = None
