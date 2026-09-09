@@ -4,10 +4,16 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from ..config import Config
-from ..keyboards import BTN_BALANCE, BTN_DEBTS, BTN_REPORT, BTN_STOCK, main_reply_kb
+from ..keyboards import BTN_BALANCE, BTN_COUNTERPARTIES, BTN_DEBTS, BTN_REPORT, BTN_STOCK, main_reply_kb
 from ..moysklad import MoySkladClient
 from .cash import TEXT_TO_KIND, enter_cash_flow
-from .report import send_balance_report, send_debts_report, send_period_choice, send_stock_report
+from .report import (
+    send_balance_report,
+    send_counterparty_choice,
+    send_debts_report,
+    send_period_choice,
+    send_stock_report,
+)
 
 # This router is included first (see handlers/__init__.py), so its
 # StateFilter("*") navigation handlers below always get first look at every
@@ -59,6 +65,14 @@ async def nav_stock(message: Message, state: FSMContext, moysklad: MoySkladClien
 async def nav_debts(message: Message, state: FSMContext, moysklad: MoySkladClient) -> None:
     await state.clear()
     await send_debts_report(message, moysklad)
+
+
+@router.message(StateFilter("*"), F.text == BTN_COUNTERPARTIES)
+async def nav_counterparties(
+    message: Message, state: FSMContext, moysklad: MoySkladClient
+) -> None:
+    await state.clear()
+    await send_counterparty_choice(message, state, moysklad)
 
 
 @router.callback_query(F.data == "cancel")

@@ -6,11 +6,15 @@ from datetime import datetime, timedelta
 
 from aiogram import F, Router
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from ..config import Config
 from ..keyboards import PERIOD_LABELS, period_choice_kb
 from ..moysklad import MoySkladClient, MoySkladError
+
+COUNTERPARTY_LOOKBACK_DAYS = 365 * 5
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +88,6 @@ async def build_period_report_text(moysklad: MoySkladClient, period: str) -> str
 
     try:
         daily = await moysklad.get_daily_cash_summary(start, now)
-        by_person = await moysklad.get_expense_by_person(start, now)
     except MoySkladError:
         logger.exception("Failed to build period report")
         return "⚠️ Не получилось получить данные из МойСклад, попробуй позже."
@@ -118,15 +121,7 @@ async def build_period_report_text(moysklad: MoySkladClient, period: str) -> str
         f"Итого доход: {total_income:.2f}",
         f"Итого расход: {total_expense:.2f}",
         f"Итого прибыль: {total_income - total_expense:.2f}",
-        "",
-        "👤 Расход по людям:",
     ]
-    if by_person:
-        for entry in by_person:
-            lines.append(f"• {entry['name']}: {entry['total']:.2f}")
-    else:
-        lines.append("(нет данных)")
-
     return "\n".join(lines)
 
 
@@ -182,6 +177,45 @@ async def build_debts_text(moysklad: MoySkladClient) -> str:
     return "\n".join(lines).strip()
 
 
+async def build_counterparty_report_text(moysklad: MoySkladClient, entry: dict) -> str:
+    """Total / this-month / today expense for one counterparty, plus a
+    day-by-day breakdown for the current month — exactly what you'd want to
+    know about how much money went to one specific person or category
+    (e.g. the director's salary/expenses).
+    """
+    now = datetime.now()
+    month_start = now.replace(day=1)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    try:
+        month_data = await moysklad.get_counterparty_expense_breakdown(
+            entry["href"], month_start, now
+        )
+        today_data = await moysklad.get_counterparty_expense_breakdown(
+            entry["href"], today_start, now
+        )
+    except MoySkladError:
+        logger.exception("Failed to build counterparty report")
+        return "⚠️ Не получилось получить данные из МойСклад, попробуй позже."
+
+    lines = [
+        f"👤 {entry['name']}",
+        "",
+        f"За сегодня: {today_data['total']:.2f}",
+        f"За этот месяц: {month_data['total']:.2f}",
+        f"Всего (последние 5 лет): {entry['total']:.2f}",
+    ]
+
+    if month_data["daily"]:
+        lines.append("")
+        lines.append("По дням в этом месяце:")
+        for day in sorted(month_data["daily"]):
+            day_label = day[8:10] + "." + day[5:7]
+            lines.append(f"{day_label}: {month_data['daily'][day]:.2f}")
+
+    return "\n".join(lines)
+
+
 async def send_balance_report(message: Message, moysklad: MoySkladClient, config: Config) -> None:
     if not message.from_user:
         return
@@ -197,6 +231,33 @@ async def send_balance_report(message: Message, moysklad: MoySkladClient, config
 
 async def send_period_choice(message: Message) -> None:
     await message.answer("За какой период показать отчёт?", reply_markup=period_choice_kb())
+
+
+async def send_counterparty_choice(
+    message: Message, state: FSMContext, moysklad: MoySkladClient
+) -> None:
+    now = datetime.now()
+    start = now - timedelta(days=COUNTERPARTY_LOOKBACK_DAYS)
+    try:
+        top = await moysklad.get_expense_by_counterparty(start, now)
+    except MoySkladError:
+        logger.exception("Failed to fetch counterparty list")
+        await message.answer("⚠️ Не получилось получить данные из МойСклад, попробуй позже.")
+        return
+
+    if not top:
+        await message.answer("Пока нет расходов, привязанных к контрагенту.")
+        return
+
+    await state.update_data(cp_choices=top)
+    builder = InlineKeyboardBuilder()
+    for i, entry in enumerate(top):
+        builder.button(text=f"{entry['name']} — {entry['total']:.0f}", callback_data=f"cpexp:{i}")
+    builder.adjust(1)
+    await message.answer(
+        "По какому контрагенту показать расход по дням/месяцам?",
+        reply_markup=builder.as_markup(),
+    )
 
 
 async def send_stock_report(message: Message, moysklad: MoySkladClient) -> None:
@@ -227,6 +288,11 @@ async def debts_report(message: Message, moysklad: MoySkladClient) -> None:
     await send_debts_report(message, moysklad)
 
 
+@router.message(Command("counterparties"))
+async def counterparties_command(message: Message, state: FSMContext, moysklad: MoySkladClient) -> None:
+    await send_counterparty_choice(message, state, moysklad)
+
+
 @router.callback_query(F.data.startswith("period:"))
 async def period_chosen(callback: CallbackQuery, moysklad: MoySkladClient) -> None:
     period = callback.data.split(":", 1)[1]
@@ -234,5 +300,20 @@ async def period_chosen(callback: CallbackQuery, moysklad: MoySkladClient) -> No
         await callback.answer("Неизвестный период", show_alert=True)
         return
     text = await build_period_report_text(moysklad, period)
+    await callback.message.edit_text(text)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("cpexp:"))
+async def counterparty_chosen(
+    callback: CallbackQuery, state: FSMContext, moysklad: MoySkladClient
+) -> None:
+    index = int(callback.data.split(":", 1)[1])
+    data = await state.get_data()
+    choices: list[dict] = data.get("cp_choices", [])
+    if index >= len(choices):
+        await callback.answer("Список устарел, открой «Контрагенты» заново", show_alert=True)
+        return
+    text = await build_counterparty_report_text(moysklad, choices[index])
     await callback.message.edit_text(text)
     await callback.answer()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime
 from typing import Any
 
@@ -10,10 +9,6 @@ import httpx
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.moysklad.ru/api/remap/1.2"
-
-# Matches the person marker this bot writes into every cash order's
-# description, e.g. "Внёс: Убайд Директор (id769546829)".
-PERSON_MARKER_RE = re.compile(r"Внёс: (.+?) \(id(\d+)\)")
 
 
 class MoySkladError(RuntimeError):
@@ -102,29 +97,25 @@ class MoySkladClient:
     async def create_counterparty(self, name: str) -> dict:
         return await self._request("POST", "/entity/counterparty", json={"name": name})
 
-    async def create_cash_in(
-        self, sum_rub: float, comment: str, employee: str, employee_id: int
-    ) -> dict:
+    async def create_cash_in(self, sum_rub: float, comment: str, employee: str) -> dict:
         organization_href = await self.get_default_organization_href()
         agent_href = await self.get_default_agent_href()
         payload = {
             "organization": self._meta(organization_href, "organization"),
             "agent": self._meta(agent_href, "counterparty"),
             "sum": round(sum_rub * 100),
-            "description": f"{comment}\n\nВнёс: {employee} (id{employee_id})",
+            "description": f"{comment}\n\nВнёс: {employee}",
         }
         return await self._request("POST", "/entity/cashin", json=payload)
 
-    async def create_cash_out(
-        self, sum_rub: float, comment: str, employee: str, employee_id: int
-    ) -> dict:
+    async def create_cash_out(self, sum_rub: float, comment: str, employee: str) -> dict:
         organization_href = await self.get_default_organization_href()
         agent_href = await self.get_default_agent_href()
         payload = {
             "organization": self._meta(organization_href, "organization"),
             "agent": self._meta(agent_href, "counterparty"),
             "sum": round(sum_rub * 100),
-            "description": f"{comment}\n\nВнёс: {employee} (id{employee_id})",
+            "description": f"{comment}\n\nВнёс: {employee}",
         }
         return await self._request("POST", "/entity/cashout", json=payload)
 
@@ -229,26 +220,38 @@ class MoySkladClient:
             debts.append({"name": row.get("name", "?"), "balance": balance})
         return debts
 
-    async def get_cash_rows(self, entity: str, start: datetime, end: datetime) -> list[dict]:
-        """Raw cashin/cashout documents (moment, sum, description) between
-        start and end (inclusive), paginated.
+    async def get_cash_rows(
+        self,
+        entity: str,
+        start: datetime,
+        end: datetime,
+        *,
+        expand_agent: bool = False,
+        agent_href: str | None = None,
+    ) -> list[dict]:
+        """Raw cashin/cashout documents (moment, sum, description, and —
+        with expand_agent — the full counterparty object) between start and
+        end (inclusive), paginated. Pass agent_href to filter server-side to
+        one specific counterparty.
         """
         rows_all: list[dict] = []
         offset = 0
         limit = 1000
+        filter_parts = [
+            f"moment>={start.strftime('%Y-%m-%d')} 00:00:00",
+            f"moment<={end.strftime('%Y-%m-%d')} 23:59:59",
+        ]
+        if agent_href:
+            filter_parts.append(f"agent={agent_href}")
         while True:
-            data = await self._request(
-                "GET",
-                f"/entity/{entity}",
-                params={
-                    "filter": (
-                        f"moment>={start.strftime('%Y-%m-%d')} 00:00:00;"
-                        f"moment<={end.strftime('%Y-%m-%d')} 23:59:59"
-                    ),
-                    "limit": limit,
-                    "offset": offset,
-                },
-            )
+            params: dict[str, Any] = {
+                "filter": ";".join(filter_parts),
+                "limit": limit,
+                "offset": offset,
+            }
+            if expand_agent:
+                params["expand"] = "agent"
+            data = await self._request("GET", f"/entity/{entity}", params=params)
             rows = data.get("rows", [])
             rows_all.extend(rows)
             if len(rows) < limit:
@@ -272,19 +275,35 @@ class MoySkladClient:
                 daily[day][key] += row.get("sum", 0) / 100
         return daily
 
-    async def get_expense_by_person(self, start: datetime, end: datetime) -> list[dict]:
-        """Total expense (cashout) per person who logged it, parsed from the
-        "Внёс: <имя> (id<telegram_id>)" marker every record carries. Records
-        created before this marker existed (or entered outside the bot) fall
-        under "Без указания".
+    async def get_expense_by_counterparty(
+        self, start: datetime, end: datetime, limit: int = 15
+    ) -> list[dict]:
+        """Total expense (cashout) grouped by counterparty (agent) — the same
+        contractor/person field already used throughout your 5 years of
+        МойСклад history (e.g. salary payments tagged with an employee's
+        name). Returns the top `limit` counterparties by total, each with
+        {name, href, total}.
         """
-        totals: dict[int, dict] = {}
-        for row in await self.get_cash_rows("cashout", start, end):
-            description = row.get("description") or ""
-            match = PERSON_MARKER_RE.search(description)
-            key = int(match.group(2)) if match else 0
-            name = match.group(1) if match else "Без указания"
-            entry = totals.setdefault(key, {"name": name, "total": 0.0})
-            entry["name"] = name
+        totals: dict[str, dict] = {}
+        for row in await self.get_cash_rows("cashout", start, end, expand_agent=True):
+            agent = row.get("agent") or {}
+            href = (agent.get("meta") or {}).get("href", "")
+            name = agent.get("name") or "Без контрагента"
+            key = href or name
+            entry = totals.setdefault(key, {"name": name, "href": href, "total": 0.0})
             entry["total"] += row.get("sum", 0) / 100
-        return sorted(totals.values(), key=lambda e: -e["total"])
+        return sorted(totals.values(), key=lambda e: -e["total"])[:limit]
+
+    async def get_counterparty_expense_breakdown(
+        self, agent_href: str, start: datetime, end: datetime
+    ) -> dict:
+        """Total + per-day expense for one specific counterparty (by href)."""
+        daily: dict[str, float] = {}
+        total = 0.0
+        for row in await self.get_cash_rows("cashout", start, end, agent_href=agent_href):
+            amount = row.get("sum", 0) / 100
+            total += amount
+            day = (row.get("moment") or "")[:10]
+            if day:
+                daily[day] = daily.get(day, 0.0) + amount
+        return {"total": total, "daily": daily}
