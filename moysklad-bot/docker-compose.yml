@@ -4,3 +4,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    sysctls:
+      # The host has IPv6 but Docker's bridge network doesn't route it, so
+      # outbound requests that try IPv6 first fail with "Network is
+      # unreachable" before falling back to IPv4. Disabling IPv6 inside the
+      # container skips straight to the working IPv4 path.
+      - net.ipv6.conf.all.disable_ipv6=1
