@@ -295,13 +295,13 @@ class MoySkladClient:
                     continue
                 seen_hrefs.add(href)
                 breakdown = await self.get_counterparty_expense_breakdown(href, start, end)
-                results.append(
-                    {
-                        "name": display_label,
-                        "href": href,
-                        "total": breakdown["total"],
-                    }
-                )
+                # If the search term is broad enough to match more than one
+                # real counterparty, keep the actual МойСклад name visible
+                # too so they don't get silently conflated under one label.
+                label = display_label
+                if len(candidates) > 1:
+                    label = f"{display_label} ({candidate.get('name', search_name)})"
+                results.append({"name": label, "href": href, "total": breakdown["total"]})
         return sorted(results, key=lambda e: -e["total"])
 
     async def get_counterparty_expense_breakdown(

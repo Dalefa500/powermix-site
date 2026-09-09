@@ -22,7 +22,7 @@ from ..moysklad import MoySkladClient, MoySkladError
 TRACKED_COUNTERPARTIES = {
     "Дивиденды": "💼 Инвестор (вы)",
     "Сулаймоншоев Убайд": "👔 Убайд — директор",
-    "Фозил Бухгалтер": "🧮 Фозил — бухгалтер",
+    "Фозил": "🧮 Фозил — бухгалтер",
     "Файзов Дилшод": "💵 Дилшод — кассир",
 }
 
@@ -188,20 +188,18 @@ async def build_debts_text(moysklad: MoySkladClient) -> str:
 
 
 async def build_counterparty_report_text(
-    moysklad: MoySkladClient, entry: dict, period_label: str
+    moysklad: MoySkladClient, entry: dict, period_label: str, period_start: datetime
 ) -> str:
-    """Total / this-month / today expense for one counterparty, plus a
-    day-by-day breakdown for the current month — exactly what you'd want to
-    know about how much money went to one specific person or category
-    (e.g. the director's salary/expenses).
+    """Today's expense plus a breakdown of the whole selected period (the
+    same one chosen in the "Команда" list — day-by-day if it's a month or
+    less, month-by-month if longer) for one counterparty.
     """
     now = datetime.now()
-    month_start = now.replace(day=1)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     try:
-        month_data = await moysklad.get_counterparty_expense_breakdown(
-            entry["href"], month_start, now
+        period_data = await moysklad.get_counterparty_expense_breakdown(
+            entry["href"], period_start, now
         )
         today_data = await moysklad.get_counterparty_expense_breakdown(
             entry["href"], today_start, now
@@ -214,16 +212,25 @@ async def build_counterparty_report_text(
         entry["name"],
         "",
         f"За сегодня: {fmt(today_data['total'])}",
-        f"За этот месяц: {fmt(month_data['total'])}",
-        f"Всего ({period_label}): {fmt(entry['total'])}",
+        f"Всего ({period_label}): {fmt(period_data['total'])}",
     ]
 
-    if month_data["daily"]:
+    daily = period_data["daily"]
+    if daily:
+        span_days = (now - period_start).days
         lines.append("")
-        lines.append("По дням в этом месяце:")
-        for day in sorted(month_data["daily"]):
-            day_label = day[8:10] + "." + day[5:7]
-            lines.append(f"{day_label}: {fmt(month_data['daily'][day])}")
+        if span_days <= 92:
+            lines.append("По дням:")
+            for day in sorted(daily):
+                day_label = day[8:10] + "." + day[5:7]
+                lines.append(f"{day_label}: {fmt(daily[day])}")
+        else:
+            monthly: dict[str, float] = defaultdict(float)
+            for day, amount in daily.items():
+                monthly[day[:7]] += amount
+            lines.append("По месяцам:")
+            for month_key in sorted(monthly):
+                lines.append(f"{month_key}: {fmt(monthly[month_key])}")
 
     return "\n".join(lines)
 
@@ -273,7 +280,7 @@ async def _show_counterparty_list(
         await edit_target.edit_text(f"Нет расходов у отслеживаемых людей {title}.")
         return
 
-    await state.update_data(cp_choices=top, cp_period_label=title)
+    await state.update_data(cp_choices=top, cp_period_label=title, cp_start=start.isoformat())
     builder = InlineKeyboardBuilder()
     for i, entry in enumerate(top):
         builder.button(
@@ -350,9 +357,11 @@ async def counterparty_chosen(
     data = await state.get_data()
     choices: list[dict] = data.get("cp_choices", [])
     period_label = data.get("cp_period_label", "за выбранный период")
-    if index >= len(choices):
+    period_start_iso = data.get("cp_start")
+    if index >= len(choices) or not period_start_iso:
         await callback.answer("Список устарел, открой «Команда» заново", show_alert=True)
         return
-    text = await build_counterparty_report_text(moysklad, choices[index], period_label)
+    period_start = datetime.fromisoformat(period_start_iso)
+    text = await build_counterparty_report_text(moysklad, choices[index], period_label, period_start)
     await callback.message.edit_text(text)
     await callback.answer()
