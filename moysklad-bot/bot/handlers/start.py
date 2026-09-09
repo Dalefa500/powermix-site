@@ -4,10 +4,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from ..config import Config
-from ..keyboards import BTN_BALANCE, BTN_DEBTS, BTN_MONTH, BTN_STOCK, main_reply_kb
+from ..keyboards import BTN_BALANCE, BTN_DEBTS, BTN_REPORT, BTN_STOCK, main_reply_kb
 from ..moysklad import MoySkladClient
 from .cash import TEXT_TO_KIND, enter_cash_flow
-from .report import send_balance_report, send_debts_report, send_month_report, send_stock_report
+from .report import send_balance_report, send_debts_report, send_period_choice, send_stock_report
 
 # This router is included first (see handlers/__init__.py), so its
 # StateFilter("*") navigation handlers below always get first look at every
@@ -43,10 +43,10 @@ async def nav_balance(
     await send_balance_report(message, moysklad, config)
 
 
-@router.message(StateFilter("*"), F.text == BTN_MONTH)
-async def nav_month(message: Message, state: FSMContext, moysklad: MoySkladClient) -> None:
+@router.message(StateFilter("*"), F.text == BTN_REPORT)
+async def nav_report(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await send_month_report(message, moysklad)
+    await send_period_choice(message)
 
 
 @router.message(StateFilter("*"), F.text == BTN_STOCK)

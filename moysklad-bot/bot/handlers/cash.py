@@ -63,14 +63,15 @@ async def cash_comment_entered(
     amount = data["amount"]
     comment = (message.text or "").strip() or "(без комментария)"
     employee = message.from_user.full_name if message.from_user else "неизвестно"
+    employee_id = message.from_user.id if message.from_user else 0
 
     await message.answer("Сохраняю в МойСклад...")
 
     try:
         if kind == "income":
-            await moysklad.create_cash_in(amount, comment, employee)
+            await moysklad.create_cash_in(amount, comment, employee, employee_id)
         else:
-            await moysklad.create_cash_out(amount, comment, employee)
+            await moysklad.create_cash_out(amount, comment, employee, employee_id)
     except MoySkladError:
         logger.exception("Failed to create cash document in MoySklad")
         await message.answer(

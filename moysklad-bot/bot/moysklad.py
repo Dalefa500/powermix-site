@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from typing import Any
 
@@ -9,6 +10,10 @@ import httpx
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.moysklad.ru/api/remap/1.2"
+
+# Matches the person marker this bot writes into every cash order's
+# description, e.g. "Внёс: Убайд Директор (id769546829)".
+PERSON_MARKER_RE = re.compile(r"Внёс: (.+?) \(id(\d+)\)")
 
 
 class MoySkladError(RuntimeError):
@@ -97,25 +102,29 @@ class MoySkladClient:
     async def create_counterparty(self, name: str) -> dict:
         return await self._request("POST", "/entity/counterparty", json={"name": name})
 
-    async def create_cash_in(self, sum_rub: float, comment: str, employee: str) -> dict:
+    async def create_cash_in(
+        self, sum_rub: float, comment: str, employee: str, employee_id: int
+    ) -> dict:
         organization_href = await self.get_default_organization_href()
         agent_href = await self.get_default_agent_href()
         payload = {
             "organization": self._meta(organization_href, "organization"),
             "agent": self._meta(agent_href, "counterparty"),
             "sum": round(sum_rub * 100),
-            "description": f"{comment}\n\nВнёс: {employee} (через Telegram-бота)",
+            "description": f"{comment}\n\nВнёс: {employee} (id{employee_id})",
         }
         return await self._request("POST", "/entity/cashin", json=payload)
 
-    async def create_cash_out(self, sum_rub: float, comment: str, employee: str) -> dict:
+    async def create_cash_out(
+        self, sum_rub: float, comment: str, employee: str, employee_id: int
+    ) -> dict:
         organization_href = await self.get_default_organization_href()
         agent_href = await self.get_default_agent_href()
         payload = {
             "organization": self._meta(organization_href, "organization"),
             "agent": self._meta(agent_href, "counterparty"),
             "sum": round(sum_rub * 100),
-            "description": f"{comment}\n\nВнёс: {employee} (через Telegram-бота)",
+            "description": f"{comment}\n\nВнёс: {employee} (id{employee_id})",
         }
         return await self._request("POST", "/entity/cashout", json=payload)
 
@@ -176,19 +185,28 @@ class MoySkladClient:
         return total
 
     async def get_stock_report(self, limit: int = 100) -> list[dict]:
-        """Current stock quantity per product/material (/report/stock/all)."""
+        """Current stock quantity per product/material (/report/stock/all),
+        grouped by product folder (МойСклад's category/group) so raw
+        materials and finished goods can be told apart — assuming the
+        account keeps them in separate folders. If a row has no folder,
+        it's labelled "Без категории".
+        """
         data = await self._request("GET", "/report/stock/all", params={"limit": limit})
         rows = data.get("rows") if isinstance(data, dict) else data
         if not isinstance(rows, list):
             raise MoySkladError("Неожиданный формат ответа /report/stock/all")
-        return [
-            {
-                "name": row.get("name", "?"),
-                "stock": row.get("stock", 0),
-                "reserve": row.get("reserve", 0),
-            }
-            for row in rows
-        ]
+        result = []
+        for row in rows:
+            folder = row.get("folder") or {}
+            result.append(
+                {
+                    "name": row.get("name", "?"),
+                    "stock": row.get("stock", 0),
+                    "reserve": row.get("reserve", 0),
+                    "folder": folder.get("name") or "Без категории",
+                }
+            )
+        return result
 
     async def get_counterparty_debts(self, limit: int = 30) -> list[dict]:
         """Outstanding balance per counterparty (/report/counterparty).
@@ -211,6 +229,33 @@ class MoySkladClient:
             debts.append({"name": row.get("name", "?"), "balance": balance})
         return debts
 
+    async def get_cash_rows(self, entity: str, start: datetime, end: datetime) -> list[dict]:
+        """Raw cashin/cashout documents (moment, sum, description) between
+        start and end (inclusive), paginated.
+        """
+        rows_all: list[dict] = []
+        offset = 0
+        limit = 1000
+        while True:
+            data = await self._request(
+                "GET",
+                f"/entity/{entity}",
+                params={
+                    "filter": (
+                        f"moment>={start.strftime('%Y-%m-%d')} 00:00:00;"
+                        f"moment<={end.strftime('%Y-%m-%d')} 23:59:59"
+                    ),
+                    "limit": limit,
+                    "offset": offset,
+                },
+            )
+            rows = data.get("rows", [])
+            rows_all.extend(rows)
+            if len(rows) < limit:
+                break
+            offset += limit
+        return rows_all
+
     async def get_daily_cash_summary(
         self, start: datetime, end: datetime
     ) -> dict[str, dict[str, float]]:
@@ -219,29 +264,27 @@ class MoySkladClient:
         """
         daily: dict[str, dict[str, float]] = {}
         for entity, key in (("cashin", "income"), ("cashout", "expense")):
-            offset = 0
-            limit = 1000
-            while True:
-                data = await self._request(
-                    "GET",
-                    f"/entity/{entity}",
-                    params={
-                        "filter": (
-                            f"moment>={start.strftime('%Y-%m-%d')} 00:00:00;"
-                            f"moment<={end.strftime('%Y-%m-%d')} 23:59:59"
-                        ),
-                        "limit": limit,
-                        "offset": offset,
-                    },
-                )
-                rows = data.get("rows", [])
-                for row in rows:
-                    day = (row.get("moment") or "")[:10]
-                    if not day:
-                        continue
-                    daily.setdefault(day, {"income": 0.0, "expense": 0.0})
-                    daily[day][key] += row.get("sum", 0) / 100
-                if len(rows) < limit:
-                    break
-                offset += limit
+            for row in await self.get_cash_rows(entity, start, end):
+                day = (row.get("moment") or "")[:10]
+                if not day:
+                    continue
+                daily.setdefault(day, {"income": 0.0, "expense": 0.0})
+                daily[day][key] += row.get("sum", 0) / 100
         return daily
+
+    async def get_expense_by_person(self, start: datetime, end: datetime) -> list[dict]:
+        """Total expense (cashout) per person who logged it, parsed from the
+        "Внёс: <имя> (id<telegram_id>)" marker every record carries. Records
+        created before this marker existed (or entered outside the bot) fall
+        under "Без указания".
+        """
+        totals: dict[int, dict] = {}
+        for row in await self.get_cash_rows("cashout", start, end):
+            description = row.get("description") or ""
+            match = PERSON_MARKER_RE.search(description)
+            key = int(match.group(2)) if match else 0
+            name = match.group(1) if match else "Без указания"
+            entry = totals.setdefault(key, {"name": name, "total": 0.0})
+            entry["name"] = name
+            entry["total"] += row.get("sum", 0) / 100
+        return sorted(totals.values(), key=lambda e: -e["total"])

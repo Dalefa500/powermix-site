@@ -4,11 +4,18 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 BTN_EXPENSE = "💸 Расход"
 BTN_INCOME = "💰 Доход"
 BTN_BALANCE = "📊 Баланс"
-BTN_MONTH = "📅 За месяц"
+BTN_REPORT = "📅 Отчёт"
 BTN_STOCK = "📦 Остатки"
 BTN_DEBTS = "📈 Долги"
 
-NAV_BUTTONS = (BTN_EXPENSE, BTN_INCOME, BTN_BALANCE, BTN_MONTH, BTN_STOCK, BTN_DEBTS)
+NAV_BUTTONS = (BTN_EXPENSE, BTN_INCOME, BTN_BALANCE, BTN_REPORT, BTN_STOCK, BTN_DEBTS)
+
+PERIOD_LABELS = {
+    "day": "День",
+    "month": "Месяц",
+    "half": "Полгода",
+    "year": "Год",
+}
 
 
 def main_reply_kb() -> ReplyKeyboardMarkup:
@@ -19,6 +26,14 @@ def main_reply_kb() -> ReplyKeyboardMarkup:
         builder.button(text=text)
     builder.adjust(2, 2, 2)
     return builder.as_markup(resize_keyboard=True)
+
+
+def period_choice_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for period, label in PERIOD_LABELS.items():
+        builder.button(text=label, callback_data=f"period:{period}")
+    builder.adjust(4)
+    return builder.as_markup()
 
 
 def cancel_kb() -> InlineKeyboardMarkup:

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 from ..config import Config
+from ..keyboards import PERIOD_LABELS, period_choice_kb
 from ..moysklad import MoySkladClient, MoySkladError
 
 logger = logging.getLogger(__name__)
@@ -64,43 +66,73 @@ async def build_balance_only_text(moysklad: MoySkladClient) -> str:
     return "\n".join(lines)
 
 
-async def build_month_report_text(moysklad: MoySkladClient) -> str:
-    """Day-by-day income/expense breakdown for the current calendar month."""
+def _period_start(period: str, now: datetime) -> tuple[datetime, str]:
+    if period == "day":
+        return now.replace(hour=0, minute=0, second=0, microsecond=0), f"за {now.strftime('%d.%m.%Y')}"
+    if period == "month":
+        return now.replace(day=1), f"за {now.strftime('%B %Y')}"
+    if period == "half":
+        return now - timedelta(days=182), "за полгода"
+    if period == "year":
+        return now - timedelta(days=365), "за год"
+    raise ValueError(f"Unknown period: {period}")
+
+
+async def build_period_report_text(moysklad: MoySkladClient, period: str) -> str:
     now = datetime.now()
-    start = now.replace(day=1)
+    start, title = _period_start(period, now)
 
     try:
         daily = await moysklad.get_daily_cash_summary(start, now)
+        by_person = await moysklad.get_expense_by_person(start, now)
     except MoySkladError:
-        logger.exception("Failed to build month report")
+        logger.exception("Failed to build period report")
         return "⚠️ Не получилось получить данные из МойСклад, попробуй позже."
 
-    lines = [f"📅 Доход/расход по дням — {start.strftime('%B %Y')}", ""]
+    total_income = sum(d["income"] for d in daily.values())
+    total_expense = sum(d["expense"] for d in daily.values())
 
-    total_income = 0.0
-    total_expense = 0.0
-    for day in sorted(daily.keys()):
-        income = daily[day]["income"]
-        expense = daily[day]["expense"]
-        total_income += income
-        total_expense += expense
-        day_label = day[8:10] + "." + day[5:7]
-        lines.append(f"{day_label}: доход {income:.2f} / расход {expense:.2f}")
+    lines = [f"📅 Отчёт {title}", ""]
 
-    if not daily:
-        lines.append("(пока нет записей за этот месяц)")
+    if period in ("day", "month"):
+        for day in sorted(daily):
+            d = daily[day]
+            day_label = day[8:10] + "." + day[5:7]
+            lines.append(f"{day_label}: доход {d['income']:.2f} / расход {d['expense']:.2f}")
+        if not daily:
+            lines.append("(пока нет записей за этот период)")
+    else:
+        monthly: dict[str, dict[str, float]] = defaultdict(lambda: {"income": 0.0, "expense": 0.0})
+        for day, d in daily.items():
+            month_key = day[:7]
+            monthly[month_key]["income"] += d["income"]
+            monthly[month_key]["expense"] += d["expense"]
+        for month_key in sorted(monthly):
+            m = monthly[month_key]
+            lines.append(f"{month_key}: доход {m['income']:.2f} / расход {m['expense']:.2f}")
+        if not monthly:
+            lines.append("(пока нет записей за этот период)")
 
     lines += [
         "",
         f"Итого доход: {total_income:.2f}",
         f"Итого расход: {total_expense:.2f}",
         f"Итого прибыль: {total_income - total_expense:.2f}",
+        "",
+        "👤 Расход по людям:",
     ]
+    if by_person:
+        for entry in by_person:
+            lines.append(f"• {entry['name']}: {entry['total']:.2f}")
+    else:
+        lines.append("(нет данных)")
+
     return "\n".join(lines)
 
 
 async def build_stock_text(moysklad: MoySkladClient) -> str:
-    """Current stock levels per product/raw material."""
+    """Stock levels grouped by product folder (raw materials vs finished
+    goods, if the account keeps them in separate MoySklad folders)."""
     try:
         stock = await moysklad.get_stock_report()
     except MoySkladError:
@@ -110,9 +142,16 @@ async def build_stock_text(moysklad: MoySkladClient) -> str:
     if not stock:
         return "📦 Остатки пусты — в МойСклад нет товаров с остатком."
 
-    lines = ["📦 Остатки на складе:", ""]
-    for item in sorted(stock, key=lambda r: r["name"]):
-        lines.append(f"• {item['name']}: {item['stock']:g}")
+    by_folder: dict[str, list[dict]] = defaultdict(list)
+    for item in stock:
+        by_folder[item["folder"]].append(item)
+
+    lines = ["📦 Остатки на складе:"]
+    for folder in sorted(by_folder):
+        lines.append("")
+        lines.append(f"— {folder} —")
+        for item in sorted(by_folder[folder], key=lambda r: r["name"]):
+            lines.append(f"• {item['name']}: {item['stock']:g}")
     return "\n".join(lines)
 
 
@@ -156,8 +195,8 @@ async def send_balance_report(message: Message, moysklad: MoySkladClient, config
         await message.answer("Эта команда тебе недоступна.")
 
 
-async def send_month_report(message: Message, moysklad: MoySkladClient) -> None:
-    await message.answer(await build_month_report_text(moysklad))
+async def send_period_choice(message: Message) -> None:
+    await message.answer("За какой период показать отчёт?", reply_markup=period_choice_kb())
 
 
 async def send_stock_report(message: Message, moysklad: MoySkladClient) -> None:
@@ -173,9 +212,9 @@ async def balance_report(message: Message, moysklad: MoySkladClient, config: Con
     await send_balance_report(message, moysklad, config)
 
 
-@router.message(Command("month"))
-async def month_report(message: Message, moysklad: MoySkladClient) -> None:
-    await send_month_report(message, moysklad)
+@router.message(Command("report"))
+async def report_command(message: Message) -> None:
+    await send_period_choice(message)
 
 
 @router.message(Command("stock"))
@@ -186,3 +225,14 @@ async def stock_report(message: Message, moysklad: MoySkladClient) -> None:
 @router.message(Command("debts"))
 async def debts_report(message: Message, moysklad: MoySkladClient) -> None:
     await send_debts_report(message, moysklad)
+
+
+@router.callback_query(F.data.startswith("period:"))
+async def period_chosen(callback: CallbackQuery, moysklad: MoySkladClient) -> None:
+    period = callback.data.split(":", 1)[1]
+    if period not in PERIOD_LABELS:
+        await callback.answer("Неизвестный период", show_alert=True)
+        return
+    text = await build_period_report_text(moysklad, period)
+    await callback.message.edit_text(text)
+    await callback.answer()
