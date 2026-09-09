@@ -36,6 +36,7 @@ class MoySkladClient:
         )
         self._organization_href: str | None = None
         self._store_href: str | None = None
+        self._default_agent_href: str | None = None
 
     async def close(self) -> None:
         await self._client.aclose()
@@ -71,6 +72,22 @@ class MoySkladClient:
             self._store_href = rows[0]["meta"]["href"]
         return self._store_href
 
+    async def get_default_agent_href(self) -> str:
+        """MoySklad requires an 'agent' (counterparty) on cash orders even
+        for internal cash flow not tied to a real client/supplier. Reuse (or
+        create once) a generic counterparty for that.
+        """
+        if self._default_agent_href is None:
+            name = "Без контрагента"
+            results = await self.search_counterparty(name, limit=1)
+            matching = [r for r in results if r.get("name") == name]
+            if matching:
+                self._default_agent_href = matching[0]["meta"]["href"]
+            else:
+                created = await self.create_counterparty(name)
+                self._default_agent_href = created["meta"]["href"]
+        return self._default_agent_href
+
     async def search_counterparty(self, name: str, limit: int = 5) -> list[dict]:
         data = await self._request(
             "GET", "/entity/counterparty", params={"search": name, "limit": limit}
@@ -88,8 +105,10 @@ class MoySkladClient:
 
     async def create_cash_in(self, sum_rub: float, comment: str, employee: str) -> dict:
         organization_href = await self.get_default_organization_href()
+        agent_href = await self.get_default_agent_href()
         payload = {
             "organization": self._meta(organization_href, "organization"),
+            "agent": self._meta(agent_href, "counterparty"),
             "sum": round(sum_rub * 100),
             "description": f"{comment}\n\nВнёс: {employee} (через Telegram-бота)",
         }
@@ -97,8 +116,10 @@ class MoySkladClient:
 
     async def create_cash_out(self, sum_rub: float, comment: str, employee: str) -> dict:
         organization_href = await self.get_default_organization_href()
+        agent_href = await self.get_default_agent_href()
         payload = {
             "organization": self._meta(organization_href, "organization"),
+            "agent": self._meta(agent_href, "counterparty"),
             "sum": round(sum_rub * 100),
             "description": f"{comment}\n\nВнёс: {employee} (через Telegram-бота)",
         }
