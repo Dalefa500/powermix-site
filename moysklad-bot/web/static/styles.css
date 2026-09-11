@@ -86,19 +86,22 @@ svg { display: block; }
   background: #000;
   padding: 24px calc(24px + env(safe-area-inset-left)) calc(30px + env(safe-area-inset-bottom));
 }
+/* Крапчатая поверхность: зерно лежит бесшовной плиткой (браузер множит
+   её без потери резкости), свет и затемнение — градиентами поверх. */
 .login::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: url("/icons/login-bg.jpg") center / cover no-repeat;
+  background: url("/icons/grain.png") repeat;
+  background-size: 256px 256px;
 }
-/* Затемнение снизу, чтобы логотип и форма читались поверх фактуры. */
 .login::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg,
-    rgba(0, 0, 0, .12) 0%, rgba(0, 0, 0, .5) 42%, rgba(0, 0, 0, .88) 68%, #000 88%);
+  background:
+    radial-gradient(120% 58% at 48% -6%, rgba(255, 255, 255, .055) 0%, transparent 62%),
+    linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, .45) 46%, rgba(0, 0, 0, .8) 74%, #000 100%);
   pointer-events: none;
 }
 .login__inner { z-index: 1; }
