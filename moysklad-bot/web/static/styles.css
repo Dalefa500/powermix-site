@@ -120,29 +120,33 @@ svg { display: block; }
   line-height: 1.05;
 }
 .login__word span { color: var(--red-light); }
+/* Мелкий текст на входе — с засечками, тонко и вразрядку: так он
+   читается дорого, в отличие от плотного рубленого шрифта. */
 .login__sub {
-  color: var(--ink-3);
-  font-size: 11px;
-  font-weight: 700;
+  font-family: Georgia, "Times New Roman", serif;
+  color: rgba(255, 255, 255, .5);
+  font-size: 10.5px;
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 3.4px;
-  margin: 12px 0 36px;
+  letter-spacing: 5px;
+  margin: 14px 0 34px;
 }
-.login__form { display: grid; gap: 14px; }
+.login__form { display: grid; gap: 12px; }
 .pin {
   width: 100%;
-  padding: 16px 18px;
-  font-size: 17px;
+  padding: 17px 18px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
   text-align: center;
-  letter-spacing: 4px;
+  letter-spacing: 2px;
   color: var(--ink);
-  background: rgba(255, 255, 255, .07);
-  border: 1px solid var(--glass-edge);
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .12);
   border-radius: 16px;
   outline: none;
   transition: border-color .15s ease, background .15s ease;
 }
-.pin::placeholder { color: var(--ink-3); letter-spacing: .5px; }
+.pin::placeholder { color: rgba(255, 255, 255, .45); letter-spacing: .5px; }
 .pin:focus {
   border-color: rgba(255, 42, 51, .75);
   background: rgba(255, 255, 255, .1);
@@ -153,29 +157,28 @@ svg { display: block; }
 .btn {
   padding: 17px 20px;
   border-radius: 16px;
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: .2px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 3px;
   transition: transform .1s ease, box-shadow .1s ease;
 }
+/* Матовый фирменный красный: глубокий, без глянца и бликов —
+   только тонкая фаска по верхнему краю. */
 .btn--primary {
   color: #fff;
-  background: linear-gradient(180deg, #ff6058 0%, #ef1b24 46%, #c00c15 100%);
-  border: 1px solid rgba(255, 255, 255, .26);
-  text-shadow: 0 1px 2px rgba(120, 0, 6, .6);
+  background: linear-gradient(180deg, #c8161d 0%, #a5111a 55%, #7d0b12 100%);
+  border: 1px solid rgba(255, 120, 120, .3);
   box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, .6),
-    inset 0 -3px 8px rgba(110, 0, 6, .55),
-    0 5px 0 -1px #8a060e,
-    0 12px 22px -10px rgba(0, 0, 0, .9);
+    inset 0 1px 0 rgba(255, 255, 255, .22),
+    0 10px 22px -14px rgba(0, 0, 0, .9);
 }
 .btn--primary:active {
-  transform: translateY(3px);
+  transform: translateY(2px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .45),
-    inset 0 -2px 6px rgba(110, 0, 6, .6),
-    0 2px 0 -1px #8a060e,
-    0 6px 12px -8px rgba(0, 0, 0, .9);
+    inset 0 1px 0 rgba(255, 255, 255, .16),
+    0 5px 12px -10px rgba(0, 0, 0, .9);
 }
 .btn[disabled] { opacity: .55; }
 .login__error {
