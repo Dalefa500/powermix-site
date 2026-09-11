@@ -89,26 +89,16 @@ svg { display: block; }
 .login::before {
   content: "";
   position: absolute;
-  inset: -40%;
-  background-image: radial-gradient(circle at center,
-    rgba(255, 226, 198, .85) 0.8px, transparent 1.4px);
-  background-size: 10px 10px;
-  transform: perspective(760px) rotateY(34deg) rotateX(7deg) scale(1.35);
-  transform-origin: 78% 26%;
-  -webkit-mask-image: radial-gradient(58% 42% at 74% 24%,
-    #000 0%, rgba(0, 0, 0, .55) 38%, rgba(0, 0, 0, .16) 62%, transparent 82%);
-  mask-image: radial-gradient(58% 42% at 74% 24%,
-    #000 0%, rgba(0, 0, 0, .55) 38%, rgba(0, 0, 0, .16) 62%, transparent 82%);
-  opacity: .9;
+  inset: 0;
+  background: url("/icons/login-bg.jpg") center / cover no-repeat;
 }
-/* Тёплый отсвет за сеткой — как на референсе. */
+/* Затемнение снизу, чтобы логотип и форма читались поверх фактуры. */
 .login::after {
   content: "";
   position: absolute;
-  right: -18%; top: -12%;
-  width: 92vw; height: 62vh;
-  background: radial-gradient(50% 50% at 50% 50%,
-    rgba(255, 214, 176, .1) 0%, transparent 70%);
+  inset: 0;
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, .12) 0%, rgba(0, 0, 0, .5) 42%, rgba(0, 0, 0, .88) 68%, #000 88%);
   pointer-events: none;
 }
 .login__inner { z-index: 1; }
