@@ -88,16 +88,10 @@ svg { display: block; }
   max-width: 348px;
   text-align: center;
 }
-.login__mark {
-  width: 128px;
-  height: auto;
-  margin: 0 auto 20px;
-  filter: drop-shadow(0 22px 44px rgba(0, 0, 0, .7));
-}
 .login__word {
-  font-size: 42px;
+  font-size: 52px;
   font-weight: 900;
-  letter-spacing: -1.2px;
+  letter-spacing: -1.6px;
   color: #fff;
   line-height: 1;
 }
