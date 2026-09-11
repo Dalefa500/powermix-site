@@ -162,7 +162,15 @@ svg { display: block; }
   font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 3px;
-  transition: transform .1s ease, box-shadow .1s ease;
+  /* Отпускание с лёгким перелётом — кнопка «пружинит» назад. */
+  transition:
+    transform .26s cubic-bezier(.22, 1.4, .4, 1),
+    box-shadow .26s ease,
+    filter .2s ease;
+}
+.btn:active {
+  /* Нажатие резкое, чтобы палец чувствовал момент касания. */
+  transition-duration: .06s;
 }
 /* Матовый фирменный красный: глубокий, без глянца и бликов —
    только тонкая фаска по верхнему краю. */
@@ -175,10 +183,12 @@ svg { display: block; }
     0 10px 22px -14px rgba(0, 0, 0, .9);
 }
 .btn--primary:active {
-  transform: translateY(2px);
+  transform: translateY(3px) scale(.985);
+  filter: brightness(.88);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .16),
-    0 5px 12px -10px rgba(0, 0, 0, .9);
+    inset 0 1px 0 rgba(255, 255, 255, .12),
+    inset 0 3px 10px rgba(0, 0, 0, .45),
+    0 3px 8px -8px rgba(0, 0, 0, .9);
 }
 .btn[disabled] { opacity: .55; }
 .login__error {
@@ -215,7 +225,14 @@ svg { display: block; }
   background: var(--glass);
   border: 1px solid var(--glass-edge);
 }
-.topbar__action:active, .topbar__back:active { background: var(--glass-strong); }
+.topbar__action, .topbar__back {
+  transition: transform .24s cubic-bezier(.22, 1.4, .4, 1), background .18s ease;
+}
+.topbar__action:active, .topbar__back:active {
+  background: var(--glass-strong);
+  transform: scale(.88);
+  transition-duration: .06s;
+}
 .topbar__action svg, .topbar__back svg {
   width: 20px; height: 20px; fill: none;
   stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
@@ -228,6 +245,22 @@ svg { display: block; }
   max-width: 640px; margin: 0 auto;
 }
 .view { display: grid; gap: 16px; }
+
+/* Содержимое вкладки всплывает при каждой загрузке — переход
+   перестаёт быть «скачком». */
+.view.is-entering > * {
+  animation: rise .38s cubic-bezier(.22, .9, .3, 1) backwards;
+}
+.view.is-entering > *:nth-child(2) { animation-delay: .05s; }
+.view.is-entering > *:nth-child(3) { animation-delay: .1s; }
+.view.is-entering > *:nth-child(n+4) { animation-delay: .14s; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .view.is-entering > * { animation: none; }
+}
 
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
@@ -249,8 +282,19 @@ svg { display: block; }
   stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
 }
 .tab.is-active { color: #fff; }
-.tab.is-active svg { filter: drop-shadow(0 0 10px rgba(255, 42, 51, .9)); color: var(--red-light); }
-.tab:active { opacity: .6; }
+.tab.is-active svg {
+  filter: drop-shadow(0 0 10px rgba(255, 42, 51, .9));
+  color: var(--red-light);
+  animation: tab-pop .34s cubic-bezier(.22, 1.5, .38, 1);
+}
+.tab svg { transition: transform .2s cubic-bezier(.22, 1.4, .4, 1); }
+.tab:active svg { transform: scale(.84); transition-duration: .06s; }
+.tab:active { opacity: .75; }
+@keyframes tab-pop {
+  0% { transform: scale(.78); }
+  60% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
 
 /* ── Стеклянные карточки ───────────────────────────────── */
 
@@ -346,8 +390,17 @@ svg { display: block; }
 .row__value--income { color: var(--income); }
 .row__value--expense { color: var(--expense); }
 
-.row--tap { width: 100%; text-align: left; }
-.row--tap:active { opacity: .55; }
+.row--tap {
+  width: 100%;
+  text-align: left;
+  border-radius: 12px;
+  transition: transform .24s cubic-bezier(.22, 1.4, .4, 1), background .18s ease;
+}
+.row--tap:active {
+  transform: scale(.975);
+  background: rgba(255, 255, 255, .06);
+  transition-duration: .06s;
+}
 .chev {
   width: 17px; height: 17px; color: var(--ink-3); fill: none;
   stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
@@ -394,7 +447,12 @@ svg { display: block; }
     0 3px 0 -1px #8a060e,
     0 8px 16px -8px rgba(0, 0, 0, .9);
 }
-.chip:active { transform: translateY(2px); }
+.chip { transition: transform .24s cubic-bezier(.22, 1.4, .4, 1), filter .18s ease; }
+.chip:active {
+  transform: translateY(2px) scale(.95);
+  filter: brightness(.85);
+  transition-duration: .06s;
+}
 
 /* ── График ────────────────────────────────────────────── */
 

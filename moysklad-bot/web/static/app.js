@@ -19,6 +19,10 @@ const state = {
   loadedAt: 0,
 };
 
+// Без слушателя касаний Safari на iPhone не применяет :active,
+// и нажатия визуально не отзываются.
+document.addEventListener("touchstart", () => {}, { passive: true });
+
 const $ = (sel) => document.querySelector(sel);
 const viewEl = (name) => document.querySelector(`.view[data-view="${name}"]`);
 
@@ -141,6 +145,10 @@ async function render() {
   const button = $("#refresh");
   button.classList.add("is-busy");
   skeleton(container, state.tab === "balance");
+  // Свежая анимация появления на каждую перерисовку
+  container.classList.remove("is-entering");
+  void container.offsetWidth;
+  container.classList.add("is-entering");
   try {
     if (state.tab === "balance") await renderBalance(container);
     else if (state.tab === "report") await renderReport(container);
