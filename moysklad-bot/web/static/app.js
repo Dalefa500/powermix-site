@@ -20,6 +20,10 @@ const state = {
   loadedAt: 0,
 };
 
+// После свайпа содержимое уже на экране — перерисовка не должна
+// проигрывать появление заново.
+let quietEntry = false;
+
 // Без слушателя касаний Safari на iPhone не применяет :active,
 // и нажатия визуально не отзываются.
 document.addEventListener("touchstart", () => {}, { passive: true });
@@ -106,6 +110,17 @@ function endLeaving(view) {
   view.hidden = true;
 }
 
+// Соседняя вкладка в заданную сторону; null на краях.
+function neighbour(step) {
+  return TAB_ORDER[TAB_ORDER.indexOf(state.tab) + step] || null;
+}
+
+function markTab(name) {
+  document
+    .querySelectorAll(".tab")
+    .forEach((t) => t.classList.toggle("is-active", t.dataset.tab === name));
+}
+
 function selectTab(name, from = 0) {
   if (name === state.tab && !state.detail) return;
   const leaving = viewEl(state.tab);
@@ -113,9 +128,7 @@ function selectTab(name, from = 0) {
   state.tab = name;
   state.detail = null;
   state.from = from; // -1 пришли слева, 1 справа, 0 без направления
-  document
-    .querySelectorAll(".tab")
-    .forEach((t) => t.classList.toggle("is-active", t.dataset.tab === name));
+  markTab(name);
 
   // Предыдущий переход мог не доиграть — снимаем его следы
   document.querySelectorAll(".view.is-leaving").forEach(endLeaving);
@@ -141,66 +154,222 @@ document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => selectTab(tab.dataset.tab));
 });
 
-/* Свайп между вкладками. Не перехватываем жест там, где он уже занят:
-   лента периодов прокручивается вбок, график показывает подсказку. */
-const SWIPE_MIN = 55; // px по горизонтали
-const SWIPE_RATIO = 1.6; // во столько раз горизонталь должна обгонять вертикаль
+/* ── Свайп между вкладками ──────────────────────────────
+   Экран идёт за пальцем: соседний подтягивается из-за края, текущий
+   отстаёт втрое и притухает. Пока палец на экране, ничего не
+   переключается — решение принимается при отрыве, по пройденному
+   пути или по скорости броска. Так жест ощущается как в iOS. */
 
-let swipe = null;
+const LOCK_MIN = 5; // px — столько нужно пройти, чтобы понять: жест горизонтальный
+const LOCK_RATIO = 1.1; // во столько раз горизонталь должна обгонять вертикаль
+const DONE_PART = 0.24; // доля ширины экрана, после которой переход состоится
+const DONE_SPEED = 0.25; // px/мс — быстрый бросок переводит и на коротком пути
+const FRESH_MS = 140; // если перед отрывом палец замер, скорость не учитываем
 
-$("#views").addEventListener(
+const views = $("#views");
+
+let gesture = null; // текущее касание
+let drag = null; // начатое перетаскивание экранов
+
+// Свайп уступает только тому, что само прокручивается вбок
+// (лента периодов) и графику с подсказкой. Поле поиска не в счёт —
+// из-за него свайп во «Команде» раньше через раз не срабатывал.
+function busyUnder(target) {
+  if (target.closest(".chart")) return true;
+  for (let node = target; node && node !== views; node = node.parentElement) {
+    if (node.scrollWidth > node.clientWidth + 2) {
+      const overflow = getComputedStyle(node).overflowX;
+      if (overflow === "auto" || overflow === "scroll") return true;
+    }
+  }
+  return false;
+}
+
+function startDrag(step) {
+  const outgoing = viewEl(state.tab);
+  const next = neighbour(step);
+  const incoming = next ? viewEl(next) : null;
+
+  document.querySelectorAll(".view.is-leaving").forEach(endLeaving);
+  outgoing.classList.add("is-dragging-out");
+
+  if (incoming) {
+    incoming.classList.remove("is-entering", "is-from-left", "is-from-right");
+    if (!incoming.firstChild) skeleton(incoming, next === "balance");
+    incoming.hidden = false;
+    incoming.classList.add("is-dragging-in");
+    incoming.style.transform = `translate3d(${step * 100}%, 0, 0)`;
+  }
+  drag = { step, next, incoming, outgoing, width: views.clientWidth || window.innerWidth, dx: 0 };
+}
+
+function paintDrag(dx) {
+  const { incoming, outgoing, step, width } = drag;
+  if (!incoming) {
+    // У края списка вкладок экран только пружинит
+    outgoing.style.transform = `translate3d(${dx / 3}px, 0, 0)`;
+    return;
+  }
+  incoming.style.transform = `translate3d(calc(${step * 100}% + ${dx}px), 0, 0)`;
+  const part = Math.min(1, Math.abs(dx) / width);
+  outgoing.style.transform = `translate3d(${dx * 0.32}px, 0, 0)`;
+  outgoing.style.opacity = String(1 - 0.45 * part);
+}
+
+// Доводим экраны до конца или возвращаем на место. Время берём по
+// остатку пути: короткий доводится быстро, длинный — привычной кривой.
+function settleDrag(commit) {
+  const { incoming, outgoing, step, next, width, dx } = drag;
+  const left = commit ? width - Math.abs(dx) : Math.abs(dx);
+  const secs = Math.max(0.12, Math.min(0.34, (left / width) * 0.38));
+
+  const finish = () => {
+    if (!drag) return;
+    drag = null;
+    [outgoing, incoming].forEach((v) => {
+      if (!v) return;
+      v.classList.remove("is-dragging-in", "is-dragging-out", "is-settling");
+      v.style.transform = "";
+      v.style.opacity = "";
+      v.style.transitionDuration = "";
+    });
+    if (commit && next) {
+      outgoing.hidden = true;
+      state.tab = next;
+      state.from = 0;
+      markTab(next);
+      window.scrollTo(0, 0);
+      quietEntry = true; // содержимое уже на экране — не проигрываем появление
+      render();
+    } else if (incoming) {
+      incoming.hidden = true;
+    }
+  };
+
+  const mover = incoming || outgoing;
+  const timer = setTimeout(finish, secs * 1000 + 90);
+  mover.addEventListener(
+    "transitionend",
+    (event) => {
+      if (event.target !== mover || event.propertyName !== "transform") return;
+      clearTimeout(timer);
+      finish();
+    },
+    { once: true },
+  );
+
+  requestAnimationFrame(() => {
+    [outgoing, incoming].forEach((v) => {
+      if (!v) return;
+      v.classList.add("is-settling");
+      v.style.transitionDuration = `${secs}s`;
+    });
+    if (commit) {
+      if (incoming) incoming.style.transform = "translate3d(0, 0, 0)";
+      outgoing.style.transform = `translate3d(${-step * 32}%, 0, 0)`;
+      outgoing.style.opacity = ".55";
+    } else {
+      if (incoming) incoming.style.transform = `translate3d(${step * 100}%, 0, 0)`;
+      outgoing.style.transform = "translate3d(0, 0, 0)";
+      outgoing.style.opacity = "1";
+    }
+  });
+}
+
+views.addEventListener(
   "touchstart",
   (event) => {
-    if (event.touches.length !== 1) {
-      swipe = null;
-      return;
-    }
+    if (drag || event.touches.length !== 1) return;
     const touch = event.touches[0];
-    swipe = {
+    gesture = {
       x: touch.clientX,
       y: touch.clientY,
-      busy: Boolean(event.target.closest(".chips, .chart, .search")),
+      px: touch.clientX,
+      pt: event.timeStamp,
+      vx: 0,
+      busy: busyUnder(event.target),
+      locked: false,
+      dead: false,
     };
   },
   { passive: true },
 );
 
-function applySwipe(dx, dy) {
-  if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return false;
+views.addEventListener(
+  "touchmove",
+  (event) => {
+    const g = gesture;
+    if (!g || g.dead || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+
+    if (!g.locked) {
+      const dx = touch.clientX - g.x;
+      const dy = touch.clientY - g.y;
+      // Сначала решаем, вдоль какой оси идёт палец, и больше не меняем
+      if (Math.abs(dy) > LOCK_MIN && Math.abs(dy) >= Math.abs(dx)) {
+        g.dead = true;
+        return;
+      }
+      if (Math.abs(dx) < LOCK_MIN || Math.abs(dx) < Math.abs(dy) * LOCK_RATIO) return;
+      if (g.busy) {
+        g.dead = true;
+        return;
+      }
+      g.locked = true;
+      g.x = touch.clientX; // считаем путь от точки захвата — экран не прыгает
+      if (!state.detail) startDrag(dx < 0 ? 1 : -1);
+    }
+
+    const move = touch.clientX - g.x;
+    if (event.timeStamp > g.pt) {
+      g.vx = (touch.clientX - g.px) / (event.timeStamp - g.pt);
+      g.px = touch.clientX;
+      g.pt = event.timeStamp;
+    }
+    if (drag) {
+      // Тянуть можно только в ту сторону, куда начали
+      const forward = drag.step === 1 ? Math.min(0, move) : Math.max(0, move);
+      drag.dx = forward;
+      paintDrag(forward);
+    }
+    event.preventDefault(); // жест наш — страница вертикально не едет
+  },
+  { passive: false },
+);
+
+function endGesture(event) {
+  const g = gesture;
+  gesture = null;
+  if (!g || !g.locked) {
+    if (drag) settleDrag(false);
+    return;
+  }
+  const touch = event.changedTouches[0];
+  const move = touch.clientX - g.x;
+  const fresh = event.timeStamp - g.pt < FRESH_MS;
+  const flick = fresh && Math.abs(g.vx) >= DONE_SPEED && Math.sign(g.vx) === Math.sign(move);
 
   // Внутри карточки человека свайп вправо возвращает к списку
   if (state.detail) {
-    if (dx > 0) {
+    const enough = move > 0 && (move > views.clientWidth * DONE_PART || flick);
+    if (enough) {
       state.detail = null;
+      state.from = -1;
       render();
     }
-    return true;
+    return;
   }
-  const step = dx < 0 ? 1 : -1;
-  const next = TAB_ORDER[TAB_ORDER.indexOf(state.tab) + step];
-  if (next) selectTab(next, step);
-  return true;
+  if (!drag) return;
+  const path = Math.abs(drag.dx);
+  settleDrag(Boolean(drag.incoming) && (path > drag.width * DONE_PART || (flick && path > 18)));
 }
 
-// Срабатываем прямо во время жеста, не дожидаясь отрыва пальца —
-// так переход ощущается мгновенным.
-$("#views").addEventListener(
-  "touchmove",
-  (event) => {
-    if (!swipe || swipe.busy || event.touches.length !== 1) return;
-    const touch = event.touches[0];
-    if (applySwipe(touch.clientX - swipe.x, touch.clientY - swipe.y)) swipe = null;
-  },
-  { passive: true },
-);
-
-$("#views").addEventListener(
-  "touchend",
-  (event) => {
-    if (!swipe || swipe.busy) return;
-    const touch = event.changedTouches[0];
-    applySwipe(touch.clientX - swipe.x, touch.clientY - swipe.y);
-    swipe = null;
+views.addEventListener("touchend", endGesture, { passive: true });
+views.addEventListener(
+  "touchcancel",
+  () => {
+    gesture = null;
+    if (drag) settleDrag(false);
   },
   { passive: true },
 );
@@ -246,22 +415,27 @@ async function render() {
   if (!container.firstChild || container.querySelector(".skeleton")) {
     skeleton(container, state.tab === "balance");
   }
-  // Свежая анимация появления на каждую перерисовку; при свайпе
-  // содержимое въезжает с той стороны, откуда пришли.
+  // Свежая анимация появления на каждую перерисовку; при переходе по
+  // кнопке содержимое въезжает с той стороны, откуда пришли.
   const ENTERING = ["is-entering", "is-from-left", "is-from-right"];
   container.classList.remove(...ENTERING);
-  void container.offsetWidth;
-  container.classList.add("is-entering");
-  if (state.from === 1) container.classList.add("is-from-right");
-  else if (state.from === -1) container.classList.add("is-from-left");
-  state.from = 0;
-  // На время перехода вкладка непрозрачна и лежит слоем выше; после
-  // снимаем — иначе она перекроет фактуру страницы.
-  container.addEventListener(
-    "animationend",
-    () => container.classList.remove(...ENTERING),
-    { once: true },
-  );
+  if (quietEntry) {
+    quietEntry = false;
+    state.from = 0;
+  } else {
+    void container.offsetWidth;
+    container.classList.add("is-entering");
+    if (state.from === 1) container.classList.add("is-from-right");
+    else if (state.from === -1) container.classList.add("is-from-left");
+    state.from = 0;
+    // На время перехода вкладка непрозрачна и лежит слоем выше; после
+    // снимаем — иначе она перекроет фактуру страницы.
+    container.addEventListener(
+      "animationend",
+      () => container.classList.remove(...ENTERING),
+      { once: true },
+    );
+  }
   try {
     if (state.tab === "balance") await renderBalance(container);
     else if (state.tab === "report") await renderReport(container);

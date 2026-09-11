@@ -318,11 +318,34 @@ svg { display: block; }
   to { transform: translateX(32%); opacity: .55; }
 }
 
+/* Свайп: экраны идут за пальцем. Пока палец на экране — никаких
+   переходов, иначе движение отстаёт от руки. */
+.view.is-dragging-in {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, #100e13 0%, #0a090d 40%, #060508 100%);
+  box-shadow: 0 0 34px rgba(0, 0, 0, .85);
+  pointer-events: none;
+  will-change: transform;
+}
+.view.is-dragging-out {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.view.is-settling {
+  transition: transform var(--ios-time) var(--ios-ease),
+              opacity var(--ios-time) var(--ios-ease);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .view.is-entering,
   .view.is-from-right,
   .view.is-from-left,
   .view.is-leaving { animation: none; }
+  .view.is-settling { transition-duration: .01s !important; }
 }
 
 .tabbar {
