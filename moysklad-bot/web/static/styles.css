@@ -62,40 +62,53 @@ svg { display: block; }
 
 /* ── Вход ──────────────────────────────────────────────── */
 
+/* Без «коробки»: свет сверху, знак и слово по центру, форма ниже.
+   Логотип не перекрашиваем — берём объёмный знак как есть,
+   а слово набираем шрифтом. */
 .login {
+  position: relative;
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 24px calc(22px + env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom));
+  overflow: hidden;
+  padding: 24px calc(24px + env(safe-area-inset-left)) calc(30px + env(safe-area-inset-bottom));
+}
+.login::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: -30%;
+  width: 150vw; height: 88vh;
+  transform: translateX(-50%);
+  background: radial-gradient(50% 50% at 50% 50%,
+    rgba(255, 74, 40, .55) 0%, rgba(196, 16, 26, .26) 44%, transparent 72%);
 }
 .login__inner {
   position: relative;
   width: 100%;
-  max-width: 344px;
+  max-width: 348px;
   text-align: center;
-  padding: 40px 26px 32px;
-  border-radius: 30px;
-  background: linear-gradient(165deg, rgba(255, 255, 255, .13) 0%, rgba(255, 255, 255, .04) 55%, rgba(255, 255, 255, .02) 100%);
-  backdrop-filter: blur(30px) saturate(140%);
-  -webkit-backdrop-filter: blur(30px) saturate(140%);
-  border: 1px solid var(--glass-edge);
-  box-shadow:
-    0 30px 70px -30px rgba(0, 0, 0, .95),
-    inset 0 1px 0 var(--glass-sheen);
 }
-.login__logo {
-  width: 216px;
+.login__mark {
+  width: 128px;
   height: auto;
-  margin: 0 auto 24px;
-  filter: drop-shadow(0 10px 26px rgba(224, 16, 25, .45));
+  margin: 0 auto 20px;
+  filter: drop-shadow(0 22px 44px rgba(0, 0, 0, .7));
 }
+.login__word {
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: -1.2px;
+  color: #fff;
+  line-height: 1;
+}
+.login__word span { color: var(--red-light); }
 .login__sub {
   color: var(--ink-3);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 3.4px;
-  margin-bottom: 30px;
+  margin: 12px 0 36px;
 }
 .login__form { display: grid; gap: 14px; }
 .pin {
