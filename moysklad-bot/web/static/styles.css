@@ -74,7 +74,9 @@ svg { display: block; }
 /* Без «коробки»: свет сверху, знак и слово по центру, форма ниже.
    Логотип не перекрашиваем — берём объёмный знак как есть,
    а слово набираем шрифтом. */
-/* Чистый чёрный фон, без свечения — логотип и кнопка сами по себе. */
+/* Чёрный фон с перфорированной поверхностью: сетка точек уходит в
+   перспективу, свет падает справа сверху. Рисуется CSS — остаётся
+   резкой на любом экране и ничего не весит. */
 .login {
   position: relative;
   min-height: 100dvh;
@@ -84,6 +86,32 @@ svg { display: block; }
   background: #000;
   padding: 24px calc(24px + env(safe-area-inset-left)) calc(30px + env(safe-area-inset-bottom));
 }
+.login::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background-image: radial-gradient(circle at center,
+    rgba(255, 226, 198, .85) 0.8px, transparent 1.4px);
+  background-size: 10px 10px;
+  transform: perspective(760px) rotateY(34deg) rotateX(7deg) scale(1.35);
+  transform-origin: 78% 26%;
+  -webkit-mask-image: radial-gradient(58% 42% at 74% 24%,
+    #000 0%, rgba(0, 0, 0, .55) 38%, rgba(0, 0, 0, .16) 62%, transparent 82%);
+  mask-image: radial-gradient(58% 42% at 74% 24%,
+    #000 0%, rgba(0, 0, 0, .55) 38%, rgba(0, 0, 0, .16) 62%, transparent 82%);
+  opacity: .9;
+}
+/* Тёплый отсвет за сеткой — как на референсе. */
+.login::after {
+  content: "";
+  position: absolute;
+  right: -18%; top: -12%;
+  width: 92vw; height: 62vh;
+  background: radial-gradient(50% 50% at 50% 50%,
+    rgba(255, 214, 176, .1) 0%, transparent 70%);
+  pointer-events: none;
+}
+.login__inner { z-index: 1; }
 .login__inner {
   position: relative;
   width: 100%;
