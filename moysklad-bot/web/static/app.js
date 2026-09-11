@@ -216,6 +216,21 @@ async function renderBalance(container) {
     ]),
   );
 
+  if (data.accounts.length) {
+    const card = el("div", "card");
+    card.append(el("div", "card__title", "Счета и кассы"));
+    const rows = el("div", "rows");
+    data.accounts.forEach((account) => {
+      const row = el("div", "row");
+      row.append(el("div", "row__label", account.name));
+      row.append(el("div", "row__value", money(account.balance)));
+      rows.append(row);
+    });
+    card.append(rows);
+    container.append(card);
+  }
+
+  // Ключевое сырьё — последним блоком, под кассой
   if (data.materials.length) {
     const anyLow = data.materials.some((item) => item.low);
     const card = el("div", `card${anyLow ? " card--warn" : ""}`);
@@ -232,20 +247,6 @@ async function renderBalance(container) {
       );
       if (item.uom) value.append(el("span", "row__unit", ` ${item.uom}`));
       row.append(value);
-      rows.append(row);
-    });
-    card.append(rows);
-    container.append(card);
-  }
-
-  if (data.accounts.length) {
-    const card = el("div", "card");
-    card.append(el("div", "card__title", "Счета и кассы"));
-    const rows = el("div", "rows");
-    data.accounts.forEach((account) => {
-      const row = el("div", "row");
-      row.append(el("div", "row__label", account.name));
-      row.append(el("div", "row__value", money(account.balance)));
       rows.append(row);
     });
     card.append(rows);
