@@ -254,7 +254,9 @@ async def stock(request: Request) -> dict:
 
     by_folder: dict[str, list[dict]] = defaultdict(list)
     for item in rows:
-        by_folder[item["folder"]].append({"name": item["name"], "stock": item["stock"]})
+        by_folder[item["folder"]].append(
+            {"name": item["name"], "stock": item["stock"], "uom": item["uom"]}
+        )
 
     return {
         "folders": [

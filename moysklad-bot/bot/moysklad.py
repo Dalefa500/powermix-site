@@ -194,12 +194,15 @@ class MoySkladClient:
         result = []
         for row in rows:
             folder = row.get("folder") or {}
+            uom = row.get("uom") or {}
             result.append(
                 {
                     "name": row.get("name", "?"),
                     "stock": row.get("stock", 0),
                     "reserve": row.get("reserve", 0),
                     "folder": folder.get("name") or "Без категории",
+                    # Единица измерения из карточки товара: кг, шт, л…
+                    "uom": uom.get("name", ""),
                 }
             )
         return result

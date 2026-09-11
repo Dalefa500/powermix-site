@@ -53,16 +53,19 @@ body {
   background: #0a0a0d;
 }
 
-/* Почти чёрный фон, свечение только вверху — как в референсах.
-   Отдельным слоем, чтобы не уезжал при прокрутке. */
+/* Та же крапчатая поверхность, что на входе, только приглушённее —
+   карточки и цифры должны оставаться читаемыми. Отдельным слоем,
+   чтобы фон не уезжал при прокрутке. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(115% 46% at 50% -6%, rgba(255, 62, 36, .3) 0%, rgba(150, 12, 20, .1) 44%, transparent 72%),
-    linear-gradient(180deg, #16131a 0%, #0f0d12 38%, #0a090c 100%);
+    radial-gradient(115% 42% at 50% -8%, rgba(255, 62, 36, .17) 0%, transparent 68%),
+    url("/icons/grain.png") repeat,
+    linear-gradient(180deg, #141218 0%, #0e0c11 40%, #09080b 100%);
+  background-size: auto, 256px 256px, auto;
 }
 
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
@@ -214,7 +217,8 @@ svg { display: block; }
 }
 .topbar__title {
   flex: 1;
-  font-size: 22px; font-weight: 800; letter-spacing: -.4px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px; font-weight: 400; letter-spacing: .6px;
   padding-left: 4px;
 }
 .topbar__action, .topbar__back {
@@ -274,7 +278,9 @@ svg { display: block; }
 }
 .tab {
   display: grid; place-items: center; gap: 4px;
-  font-size: 10.5px; font-weight: 650; color: var(--ink-3);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 10.5px; font-weight: 400; letter-spacing: .7px;
+  color: var(--ink-3);
   transition: color .15s ease;
 }
 .tab svg {
@@ -314,9 +320,13 @@ svg { display: block; }
     inset 0 -1px 0 rgba(0, 0, 0, .5),
     0 14px 28px -16px rgba(0, 0, 0, .95);
 }
+/* Подписи — с засечками вразрядку, как на входе.
+   Цифры остаются рубленым шрифтом: у Georgia цифры разной высоты,
+   и суммы в столбцах выглядели бы неровно. */
 .card__title {
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 1.8px; text-transform: uppercase;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 11px; font-weight: 400;
+  letter-spacing: 2.4px; text-transform: uppercase;
   color: var(--ink-3);
   margin-bottom: 16px;
 }
@@ -330,9 +340,10 @@ svg { display: block; }
   padding: 26px 22px;
 }
 .hero__label {
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 2px; text-transform: uppercase;
-  color: rgba(255, 255, 255, .66);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 11px; font-weight: 400;
+  letter-spacing: 2.8px; text-transform: uppercase;
+  color: rgba(255, 255, 255, .6);
 }
 .hero__value {
   font-size: 44px; font-weight: 800; letter-spacing: -1.6px;
@@ -358,10 +369,11 @@ svg { display: block; }
     inset 0 -1px 0 rgba(0, 0, 0, .45);
 }
 .tile__label {
-  font-size: 10.5px; font-weight: 700;
-  letter-spacing: 1px; text-transform: uppercase;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 10.5px; font-weight: 400;
+  letter-spacing: 1.4px; text-transform: uppercase;
   color: var(--ink-3);
-  min-height: 2.6em;
+  min-height: 2.8em;
 }
 .tile__value {
   font-size: clamp(14px, 4.6vw, 19px); font-weight: 800; letter-spacing: -.5px;
@@ -382,7 +394,13 @@ svg { display: block; }
   font-size: 16px;
 }
 .row:first-child { border-top: 0; }
-.row__label { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--ink-2); }
+.row__label {
+  flex: 1; min-width: 0; overflow-wrap: anywhere;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink-2);
+}
+/* Единица измерения приглушена — цифра остаётся главной. */
+.row__unit { color: var(--ink-3); font-weight: 400; font-size: .84em; }
 .row__value {
   font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap;
 }
@@ -407,7 +425,10 @@ svg { display: block; }
 }
 
 .person { padding: 15px 0; }
-.person__name { flex: 1; font-size: 16.5px; font-weight: 650; color: #fff; }
+.person__name {
+  flex: 1; font-family: Georgia, "Times New Roman", serif;
+  font-size: 16.5px; font-weight: 400; color: #fff;
+}
 .person__total {
   font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums;
   color: var(--expense);

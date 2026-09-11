@@ -315,7 +315,9 @@ async function renderStock(container) {
       items.forEach((item) => {
         const row = el("div", "row");
         row.append(el("div", "row__label", item.name));
-        row.append(el("div", "row__value", qty(item.stock)));
+        const value = el("div", "row__value", qty(item.stock));
+        if (item.uom) value.append(el("span", "row__unit", ` ${item.uom}`));
+        row.append(value);
         rows.append(row);
       });
       card.append(rows);
