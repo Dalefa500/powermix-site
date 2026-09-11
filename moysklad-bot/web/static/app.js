@@ -216,6 +216,28 @@ async function renderBalance(container) {
     ]),
   );
 
+  if (data.materials.length) {
+    const anyLow = data.materials.some((item) => item.low);
+    const card = el("div", `card${anyLow ? " card--warn" : ""}`);
+    card.append(el("div", "card__title", "Ключевое сырьё"));
+    const rows = el("div", "rows");
+    data.materials.forEach((item) => {
+      const row = el("div", "row");
+      if (item.low) row.append(el("span", "dot"));
+      row.append(el("div", "row__label", item.name));
+      const value = el(
+        "div",
+        `row__value${item.low ? " row__value--warn" : ""}`,
+        qty(item.stock),
+      );
+      if (item.uom) value.append(el("span", "row__unit", ` ${item.uom}`));
+      row.append(value);
+      rows.append(row);
+    });
+    card.append(rows);
+    container.append(card);
+  }
+
   if (data.accounts.length) {
     const card = el("div", "card");
     card.append(el("div", "card__title", "Счета и кассы"));

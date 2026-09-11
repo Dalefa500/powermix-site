@@ -24,7 +24,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from pydantic import BaseModel
 
 from bot.moysklad import MoySkladClient, MoySkladError
-from bot.people import TRACKED_COUNTERPARTIES
+from bot.people import KEY_MATERIALS, TRACKED_COUNTERPARTIES
 
 load_dotenv()
 
@@ -196,7 +196,35 @@ async def summary(request: Request) -> dict:
         "accounts": accounts,
         "total_balance": total,
         "balance_is_estimate": estimated,
+        "materials": await _key_materials(moysklad),
     }
+
+
+async def _key_materials(moysklad: MoySkladClient) -> list[dict]:
+    """Остатки ключевого сырья для «Баланса». Если склад не ответил —
+    возвращаем пусто: баланс важнее и должен открыться в любом случае."""
+    try:
+        rows = await moysklad.get_stock_report()
+    except MoySkladError:
+        logger.exception("Failed to fetch stock for key materials")
+        return []
+
+    found: list[dict] = []
+    for term in KEY_MATERIALS:
+        needle = term.casefold()
+        for row in rows:
+            if needle in row["name"].casefold():
+                in_kg = row["uom"].strip().lower().startswith(("кг", "килогра"))
+                found.append(
+                    {
+                        "name": row["name"],
+                        "stock": row["stock"],
+                        "uom": row["uom"],
+                        "low": in_kg and row["stock"] < LOW_STOCK_KG,
+                    }
+                )
+                break
+    return found
 
 
 @app.get("/api/report", dependencies=authed)
