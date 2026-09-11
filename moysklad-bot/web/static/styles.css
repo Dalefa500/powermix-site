@@ -8,8 +8,8 @@
   --red-deep: #8c0812;
 
   --ink: #ffffff;
-  --ink-2: rgba(255, 255, 255, .74);
-  --ink-3: rgba(255, 255, 255, .46);
+  --ink-2: rgba(255, 255, 255, .86);
+  --ink-3: rgba(255, 255, 255, .58);
 
   /* Стекло */
   --glass: rgba(255, 255, 255, .055);
@@ -62,9 +62,10 @@ body::before {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(115% 42% at 50% -8%, rgba(255, 62, 36, .17) 0%, transparent 68%),
+    /* тёмная вуаль поверх зерна — фактура видна, но не светит */
+    linear-gradient(rgba(0, 0, 0, .42), rgba(0, 0, 0, .42)),
     url("/icons/grain.png") repeat,
-    linear-gradient(180deg, #141218 0%, #0e0c11 40%, #09080b 100%);
+    linear-gradient(180deg, #100e13 0%, #0a090d 40%, #060508 100%);
   background-size: auto, 256px 256px, auto;
 }
 
@@ -309,7 +310,7 @@ svg { display: block; }
 .card {
   position: relative;
   background: linear-gradient(162deg,
-    rgba(255, 255, 255, .1) 0%, rgba(255, 255, 255, .04) 42%, rgba(255, 255, 255, .022) 100%);
+    rgba(28, 25, 30, .82) 0%, rgba(20, 18, 23, .78) 42%, rgba(16, 14, 19, .8) 100%);
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
   border: 1px solid rgba(255, 255, 255, .15);
@@ -334,9 +335,8 @@ svg { display: block; }
 /* Главная карточка — то же стекло, но со свечением внутри. */
 .hero {
   overflow: hidden;
-  background:
-    radial-gradient(95% 130% at 100% -10%, rgba(255, 62, 36, .34) 0%, transparent 62%),
-    linear-gradient(160deg, rgba(255, 255, 255, .12) 0%, rgba(255, 255, 255, .04) 60%);
+  background: linear-gradient(160deg,
+    rgba(38, 34, 40, .88) 0%, rgba(24, 21, 27, .84) 55%, rgba(18, 16, 21, .86) 100%);
   padding: 26px 22px;
 }
 .hero__label {
@@ -357,7 +357,7 @@ svg { display: block; }
 .tiles--two { grid-template-columns: repeat(2, 1fr); }
 .tile {
   background: linear-gradient(160deg,
-    rgba(255, 255, 255, .095) 0%, rgba(255, 255, 255, .035) 55%, rgba(255, 255, 255, .02) 100%);
+    rgba(28, 25, 30, .8) 0%, rgba(19, 17, 22, .76) 55%, rgba(16, 14, 19, .78) 100%);
   backdrop-filter: blur(12px) saturate(160%);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
   border: 1px solid rgba(255, 255, 255, .14);
