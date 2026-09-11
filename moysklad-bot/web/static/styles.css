@@ -74,23 +74,15 @@ svg { display: block; }
 /* Без «коробки»: свет сверху, знак и слово по центру, форма ниже.
    Логотип не перекрашиваем — берём объёмный знак как есть,
    а слово набираем шрифтом. */
+/* Чистый чёрный фон, без свечения — логотип и кнопка сами по себе. */
 .login {
   position: relative;
   min-height: 100dvh;
   display: grid;
   place-items: center;
   overflow: hidden;
+  background: #000;
   padding: 24px calc(24px + env(safe-area-inset-left)) calc(30px + env(safe-area-inset-bottom));
-}
-/* Свет собранный, а не размазанный по всему экрану. */
-.login::before {
-  content: "";
-  position: absolute;
-  left: 50%; top: -22%;
-  width: 116vw; height: 58vh;
-  transform: translateX(-50%);
-  background: radial-gradient(50% 50% at 50% 50%,
-    rgba(255, 70, 38, .5) 0%, rgba(180, 12, 20, .14) 45%, transparent 68%);
 }
 .login__inner {
   position: relative;
