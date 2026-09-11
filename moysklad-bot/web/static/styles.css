@@ -270,6 +270,18 @@ svg { display: block; }
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: none; }
 }
+
+/* При свайпе содержимое въезжает с той стороны, откуда пришли. */
+.view.is-from-right > * { animation-name: slide-right; }
+.view.is-from-left > * { animation-name: slide-left; }
+@keyframes slide-right {
+  from { opacity: 0; transform: translateX(34px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes slide-left {
+  from { opacity: 0; transform: translateX(-34px); }
+  to { opacity: 1; transform: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .view.is-entering > * { animation: none; }
 }

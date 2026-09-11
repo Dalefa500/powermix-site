@@ -16,6 +16,7 @@ const state = {
   teamDays: 30,
   detail: null, // {href, name} когда открыт человек из «Команды»
   stockQuery: "",
+  from: 0, // направление последнего перехода между вкладками
   loadedAt: 0,
 };
 
@@ -96,20 +97,75 @@ $("#login-form").addEventListener("submit", async (event) => {
 
 /* ── Навигация ────────────────────────────────────────── */
 
-document.querySelectorAll(".tab").forEach((tab) => {
-  tab.addEventListener("click", () => {
-    const name = tab.dataset.tab;
-    if (name === state.tab && !state.detail) return;
-    state.tab = name;
-    state.detail = null;
-    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t === tab));
-    document.querySelectorAll(".view").forEach((v) => {
-      v.hidden = v.dataset.view !== name;
-    });
-    window.scrollTo(0, 0);
-    render();
+const TAB_ORDER = ["balance", "report", "stock", "team"];
+
+function selectTab(name, from = 0) {
+  if (name === state.tab && !state.detail) return;
+  state.tab = name;
+  state.detail = null;
+  state.from = from; // -1 пришли слева, 1 справа, 0 без направления
+  document
+    .querySelectorAll(".tab")
+    .forEach((t) => t.classList.toggle("is-active", t.dataset.tab === name));
+  document.querySelectorAll(".view").forEach((v) => {
+    v.hidden = v.dataset.view !== name;
   });
+  window.scrollTo(0, 0);
+  render();
+}
+
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => selectTab(tab.dataset.tab));
 });
+
+/* Свайп между вкладками. Не перехватываем жест там, где он уже занят:
+   лента периодов прокручивается вбок, график показывает подсказку. */
+const SWIPE_MIN = 55; // px по горизонтали
+const SWIPE_RATIO = 1.6; // во столько раз горизонталь должна обгонять вертикаль
+
+let swipe = null;
+
+$("#views").addEventListener(
+  "touchstart",
+  (event) => {
+    if (event.touches.length !== 1) {
+      swipe = null;
+      return;
+    }
+    const touch = event.touches[0];
+    swipe = {
+      x: touch.clientX,
+      y: touch.clientY,
+      busy: Boolean(event.target.closest(".chips, .chart, .search")),
+    };
+  },
+  { passive: true },
+);
+
+$("#views").addEventListener(
+  "touchend",
+  (event) => {
+    if (!swipe || swipe.busy) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - swipe.x;
+    const dy = touch.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
+
+    // Внутри карточки человека свайп вправо возвращает к списку
+    if (state.detail) {
+      if (dx > 0) {
+        state.detail = null;
+        render();
+      }
+      return;
+    }
+    const step = dx < 0 ? 1 : -1;
+    const next = TAB_ORDER[TAB_ORDER.indexOf(state.tab) + step];
+    if (next) selectTab(next, step);
+  },
+  { passive: true },
+);
 
 $("#back").addEventListener("click", () => {
   state.detail = null;
@@ -147,10 +203,14 @@ async function render() {
   const button = $("#refresh");
   button.classList.add("is-busy");
   skeleton(container, state.tab === "balance");
-  // Свежая анимация появления на каждую перерисовку
-  container.classList.remove("is-entering");
+  // Свежая анимация появления на каждую перерисовку; при свайпе
+  // содержимое въезжает с той стороны, откуда пришли.
+  container.classList.remove("is-entering", "is-from-left", "is-from-right");
   void container.offsetWidth;
   container.classList.add("is-entering");
+  if (state.from === 1) container.classList.add("is-from-right");
+  else if (state.from === -1) container.classList.add("is-from-left");
+  state.from = 0;
   try {
     if (state.tab === "balance") await renderBalance(container);
     else if (state.tab === "report") await renderReport(container);
