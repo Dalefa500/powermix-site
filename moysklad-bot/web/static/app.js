@@ -30,6 +30,8 @@ const nf = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 });
 const money = (n) => `${nf.format(Math.round(n || 0))} с.`;
 // В плитках место узкое — единица валюты подразумевается, как в кассе.
 const amount = (n) => nf.format(Math.round(n || 0));
+// Знак суммы: минус красным, плюс зелёным, ноль обычным.
+const sign = (n) => (n < 0 ? "neg" : n > 0 ? "pos" : "");
 const qty = (n) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 3 }).format(n || 0);
 
 function el(tag, className, text) {
@@ -202,7 +204,9 @@ async function renderBalance(container) {
 
   const hero = el("div", "card hero");
   hero.append(el("div", "hero__label", "Остаток в кассе"));
-  hero.append(el("div", "hero__value", money(data.total_balance)));
+  hero.append(
+    el("div", `hero__value is-${sign(data.total_balance)}`, money(data.total_balance)),
+  );
   if (data.balance_is_estimate) {
     hero.append(el("div", "hero__note", "Посчитано по всем кассовым ордерам"));
   }
@@ -212,7 +216,7 @@ async function renderBalance(container) {
     tiles([
       { label: "Доход сегодня", value: amount(data.today.income), tone: "income" },
       { label: "Расход сегодня", value: amount(data.today.expense), tone: "expense" },
-      { label: "Итог", value: amount(data.today.profit) },
+      { label: "Итог", value: amount(data.today.profit), tone: sign(data.today.profit) },
     ]),
   );
 
@@ -223,7 +227,7 @@ async function renderBalance(container) {
     data.accounts.forEach((account) => {
       const row = el("div", "row");
       row.append(el("div", "row__label", account.name));
-      row.append(el("div", "row__value", money(account.balance)));
+      row.append(el("div", `row__value is-${sign(account.balance)}`, money(account.balance)));
       rows.append(row);
     });
     card.append(rows);
@@ -271,7 +275,7 @@ async function renderReport(container) {
     tiles([
       { label: "Доход", value: amount(data.totals.income), tone: "income" },
       { label: "Расход", value: amount(data.totals.expense), tone: "expense" },
-      { label: "Прибыль", value: amount(data.totals.profit) },
+      { label: "Прибыль", value: amount(data.totals.profit), tone: sign(data.totals.profit) },
     ]),
   );
 
