@@ -99,17 +99,40 @@ $("#login-form").addEventListener("submit", async (event) => {
 
 const TAB_ORDER = ["balance", "report", "stock", "team"];
 
+const LEAVING = ["is-leaving", "to-right"];
+
+function endLeaving(view) {
+  view.classList.remove(...LEAVING);
+  view.hidden = true;
+}
+
 function selectTab(name, from = 0) {
   if (name === state.tab && !state.detail) return;
+  const leaving = viewEl(state.tab);
+
   state.tab = name;
   state.detail = null;
   state.from = from; // -1 пришли слева, 1 справа, 0 без направления
   document
     .querySelectorAll(".tab")
     .forEach((t) => t.classList.toggle("is-active", t.dataset.tab === name));
+
+  // Предыдущий переход мог не доиграть — снимаем его следы
+  document.querySelectorAll(".view.is-leaving").forEach(endLeaving);
+
   document.querySelectorAll(".view").forEach((v) => {
-    v.hidden = v.dataset.view !== name;
+    if (v !== leaving) v.hidden = v.dataset.view !== name;
   });
+
+  if (from && leaving) {
+    // Уходящий экран остаётся на виду и отъезжает — как в iOS
+    leaving.classList.add("is-leaving");
+    if (from === -1) leaving.classList.add("to-right");
+    leaving.addEventListener("animationend", () => endLeaving(leaving), { once: true });
+  } else if (leaving) {
+    leaving.hidden = true;
+  }
+
   window.scrollTo(0, 0);
   render();
 }
@@ -225,12 +248,20 @@ async function render() {
   }
   // Свежая анимация появления на каждую перерисовку; при свайпе
   // содержимое въезжает с той стороны, откуда пришли.
-  container.classList.remove("is-entering", "is-from-left", "is-from-right");
+  const ENTERING = ["is-entering", "is-from-left", "is-from-right"];
+  container.classList.remove(...ENTERING);
   void container.offsetWidth;
   container.classList.add("is-entering");
   if (state.from === 1) container.classList.add("is-from-right");
   else if (state.from === -1) container.classList.add("is-from-left");
   state.from = 0;
+  // На время перехода вкладка непрозрачна и лежит слоем выше; после
+  // снимаем — иначе она перекроет фактуру страницы.
+  container.addEventListener(
+    "animationend",
+    () => container.classList.remove(...ENTERING),
+    { once: true },
+  );
   try {
     if (state.tab === "balance") await renderBalance(container);
     else if (state.tab === "report") await renderReport(container);

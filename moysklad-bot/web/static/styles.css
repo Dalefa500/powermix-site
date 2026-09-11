@@ -252,14 +252,24 @@ svg { display: block; }
 .topbar__action.is-busy svg { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Отступы живут на самих вкладках, а не на контейнере: во время
+   перехода уходящий экран кладётся поверх абсолютом и должен
+   совпадать с приходящим по геометрии. */
 #views {
-  padding: 16px 16px calc(var(--tabbar-h) + 30px + env(safe-area-inset-bottom));
+  position: relative;
+  overflow-x: clip;
   max-width: 640px; margin: 0 auto;
 }
-.view { display: grid; gap: 16px; }
+.view {
+  display: grid; gap: 16px;
+  padding: 16px 16px calc(var(--tabbar-h) + 30px + env(safe-area-inset-bottom));
+}
 
-/* Экран въезжает целиком, а не карточками по очереди: так переход
-   короче и читается как одно движение. */
+/* Переход как в iOS: новый экран приходит от края на полной скорости,
+   старый уходит втрое медленнее и притухает — отсюда ощущение глубины.
+   Кривая — та же, что у системных панелей iOS. */
+:root { --ios-ease: cubic-bezier(.32, .72, 0, 1); --ios-time: .34s; }
+
 .view.is-entering {
   animation: rise .22s cubic-bezier(.25, .9, .3, 1) backwards;
   will-change: transform, opacity;
@@ -269,19 +279,50 @@ svg { display: block; }
   to { opacity: 1; transform: none; }
 }
 
-/* При свайпе — с той стороны, откуда пришли. */
-.view.is-from-right { animation-name: slide-right; }
-.view.is-from-left { animation-name: slide-left; }
-@keyframes slide-right {
-  from { opacity: 0; transform: translateX(30px); }
-  to { opacity: 1; transform: none; }
+/* Приходящий экран накрывает уходящий — иначе старое просвечивает
+   сквозь новое. Тень по краю даёт ощущение слоя. */
+.view.is-from-right,
+.view.is-from-left {
+  position: relative;
+  z-index: 2;
+  background: linear-gradient(180deg, #100e13 0%, #0a090d 40%, #060508 100%);
+  animation: push-in var(--ios-time) var(--ios-ease) backwards;
+  box-shadow: 0 0 34px rgba(0, 0, 0, .85);
 }
-@keyframes slide-left {
-  from { opacity: 0; transform: translateX(-30px); }
-  to { opacity: 1; transform: none; }
+.view.is-from-left { animation-name: push-in-back; }
+
+/* Уходящий экран остаётся под ним, пока не доедет. */
+.view.is-leaving {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 1;
+  pointer-events: none;
+  animation: push-out var(--ios-time) var(--ios-ease) forwards;
 }
+.view.is-leaving.to-right { animation-name: push-out-back; }
+
+@keyframes push-in {
+  from { transform: translateX(100%); }
+  to { transform: none; }
+}
+@keyframes push-in-back {
+  from { transform: translateX(-100%); }
+  to { transform: none; }
+}
+@keyframes push-out {
+  from { transform: none; opacity: 1; }
+  to { transform: translateX(-32%); opacity: .55; }
+}
+@keyframes push-out-back {
+  from { transform: none; opacity: 1; }
+  to { transform: translateX(32%); opacity: .55; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .view.is-entering { animation: none; }
+  .view.is-entering,
+  .view.is-from-right,
+  .view.is-from-left,
+  .view.is-leaving { animation: none; }
 }
 
 .tabbar {
