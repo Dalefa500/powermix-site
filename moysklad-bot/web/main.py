@@ -32,6 +32,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
+# Сколько килограммов считать «на исходе». Порог применяется к позициям,
+# которые measured в кг; меняется в .env без правки кода.
+LOW_STOCK_KG = float(os.environ.get("LOW_STOCK_KG", "1000"))
 COOKIE_NAME = "pmx_session"
 SESSION_MAX_AGE = 60 * 60 * 24 * 30  # stay logged in for a month
 DAY_LEVEL_MAX_DAYS = 92  # longer than this and the UI switches to months
@@ -253,16 +256,32 @@ async def stock(request: Request) -> dict:
         raise HTTPException(status_code=502, detail=str(exc))
 
     by_folder: dict[str, list[dict]] = defaultdict(list)
+    low: list[dict] = []
     for item in rows:
-        by_folder[item["folder"]].append(
-            {"name": item["name"], "stock": item["stock"], "uom": item["uom"]}
-        )
+        # МойСклад пишет единицу по-разному: «кг», «Килограмм» — сверяем начало.
+        in_kg = item["uom"].strip().lower().startswith(("кг", "килогра"))
+        entry = {
+            "name": item["name"],
+            "stock": item["stock"],
+            "uom": item["uom"],
+            "low": in_kg and item["stock"] < LOW_STOCK_KG,
+        }
+        by_folder[item["folder"]].append(entry)
+        if entry["low"]:
+            low.append(entry)
 
     return {
         "folders": [
-            {"name": folder, "items": sorted(by_folder[folder], key=lambda i: i["name"])}
+            {
+                "name": folder,
+                "items": sorted(by_folder[folder], key=lambda i: i["name"]),
+                "low": sum(1 for i in by_folder[folder] if i["low"]),
+            }
             for folder in sorted(by_folder)
-        ]
+        ],
+        # Самые критичные — впереди
+        "low": sorted(low, key=lambda i: i["stock"]),
+        "low_threshold": LOW_STOCK_KG,
     }
 
 

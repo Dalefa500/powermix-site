@@ -302,6 +302,27 @@ async function renderStock(container) {
   const draw = () => {
     const needle = state.stockQuery.trim().toLowerCase();
     results.replaceChildren();
+
+    // Что заканчивается — впереди списка, пока не начали искать
+    if (!needle && data.low.length) {
+      const card = el("div", "card card--warn");
+      card.append(
+        el("div", "card__title", `На исходе · меньше ${qty(data.low_threshold)} кг`),
+      );
+      const rows = el("div", "rows");
+      data.low.forEach((item) => {
+        const row = el("div", "row");
+        row.append(el("span", "dot"));
+        row.append(el("div", "row__label", item.name));
+        const value = el("div", "row__value row__value--warn", qty(item.stock));
+        value.append(el("span", "row__unit", ` ${item.uom}`));
+        row.append(value);
+        rows.append(row);
+      });
+      card.append(rows);
+      results.append(card);
+    }
+
     let shown = 0;
     data.folders.forEach((folder) => {
       const items = needle
@@ -310,12 +331,20 @@ async function renderStock(container) {
       if (!items.length) return;
       shown += items.length;
       const card = el("div", "card");
-      card.append(el("div", "card__title", `${folder.name} · ${items.length}`));
+      const lowHere = items.filter((item) => item.low).length;
+      const title = el("div", "card__title", `${folder.name} · ${items.length}`);
+      if (lowHere) title.append(el("span", "card__warn", ` · ${lowHere} на исходе`));
+      card.append(title);
       const rows = el("div", "rows");
       items.forEach((item) => {
         const row = el("div", "row");
+        if (item.low) row.append(el("span", "dot"));
         row.append(el("div", "row__label", item.name));
-        const value = el("div", "row__value", qty(item.stock));
+        const value = el(
+          "div",
+          `row__value${item.low ? " row__value--warn" : ""}`,
+          qty(item.stock),
+        );
         if (item.uom) value.append(el("span", "row__unit", ` ${item.uom}`));
         row.append(value);
         rows.append(row);

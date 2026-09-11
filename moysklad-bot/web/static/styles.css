@@ -25,6 +25,9 @@
   --expense: #cc7f22;
   --grid: rgba(255, 255, 255, .1);
 
+  /* Тревожный цвет для «на исходе» — контраст 6.3:1 на карточке. */
+  --warn: #ff6c5c;
+
   --radius: 24px;
   --radius-sm: 16px;
   --tabbar-h: 62px;
@@ -403,6 +406,28 @@ svg { display: block; }
 }
 /* Единица измерения приглушена — цифра остаётся главной. */
 .row__unit { color: var(--ink-3); font-weight: 400; font-size: .84em; }
+
+/* Сигнал «на исходе»: цвет + точка + подпись, чтобы читался и при
+   ярком солнце, и при дальтонизме — не одним оттенком. */
+.row__value--warn { color: var(--warn); }
+.card--warn { border-color: rgba(255, 108, 92, .34); }
+.card--warn .card__title { color: var(--warn); }
+.card__warn { color: var(--warn); }
+.dot {
+  flex: none;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 10px rgba(255, 108, 92, .75);
+  animation: pulse 2.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dot { animation: none; }
+}
 .row__value {
   font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap;
 }
