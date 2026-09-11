@@ -206,15 +206,17 @@ svg { display: block; }
 
 /* ── Каркас ────────────────────────────────────────────── */
 
+/* Панели без размытия и без границы: фактура фона проходит сквозь них
+   непрерывно, и экран читается как одна поверхность, а не три полосы.
+   Затемнение растворяется к краю содержимого. */
 .topbar {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; gap: 4px;
   padding: 12px 14px;
   padding-top: calc(12px + env(safe-area-inset-top));
-  background: rgba(12, 10, 14, .55);
-  backdrop-filter: blur(24px) saturate(150%);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
-  border-bottom: 1px solid var(--hairline);
+  background: linear-gradient(180deg,
+    rgba(6, 5, 8, .9) 0%, rgba(6, 5, 8, .74) 58%, rgba(6, 5, 8, 0) 100%);
+  border-bottom: 0;
 }
 .topbar__title {
   flex: 1;
@@ -270,12 +272,12 @@ svg { display: block; }
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
   display: grid; grid-template-columns: repeat(4, 1fr);
-  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  height: calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(12, 10, 14, .6);
-  backdrop-filter: blur(26px) saturate(150%);
-  -webkit-backdrop-filter: blur(26px) saturate(150%);
-  border-top: 1px solid var(--hairline);
+  align-items: end;
+  background: linear-gradient(0deg,
+    rgba(6, 5, 8, .94) 0%, rgba(6, 5, 8, .88) 46%, rgba(6, 5, 8, 0) 100%);
+  border-top: 0;
 }
 .tab {
   display: grid; place-items: center; gap: 4px;
