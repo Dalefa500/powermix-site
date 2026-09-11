@@ -258,32 +258,30 @@ svg { display: block; }
 }
 .view { display: grid; gap: 16px; }
 
-/* Содержимое вкладки всплывает при каждой загрузке — переход
-   перестаёт быть «скачком». */
-.view.is-entering > * {
-  animation: rise .38s cubic-bezier(.22, .9, .3, 1) backwards;
+/* Экран въезжает целиком, а не карточками по очереди: так переход
+   короче и читается как одно движение. */
+.view.is-entering {
+  animation: rise .22s cubic-bezier(.25, .9, .3, 1) backwards;
+  will-change: transform, opacity;
 }
-.view.is-entering > *:nth-child(2) { animation-delay: .05s; }
-.view.is-entering > *:nth-child(3) { animation-delay: .1s; }
-.view.is-entering > *:nth-child(n+4) { animation-delay: .14s; }
 @keyframes rise {
-  from { opacity: 0; transform: translateY(14px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
 }
 
-/* При свайпе содержимое въезжает с той стороны, откуда пришли. */
-.view.is-from-right > * { animation-name: slide-right; }
-.view.is-from-left > * { animation-name: slide-left; }
+/* При свайпе — с той стороны, откуда пришли. */
+.view.is-from-right { animation-name: slide-right; }
+.view.is-from-left { animation-name: slide-left; }
 @keyframes slide-right {
-  from { opacity: 0; transform: translateX(34px); }
+  from { opacity: 0; transform: translateX(30px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes slide-left {
-  from { opacity: 0; transform: translateX(-34px); }
+  from { opacity: 0; transform: translateX(-30px); }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .view.is-entering > * { animation: none; }
+  .view.is-entering { animation: none; }
 }
 
 .tabbar {

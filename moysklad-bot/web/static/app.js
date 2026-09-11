@@ -142,27 +142,42 @@ $("#views").addEventListener(
   { passive: true },
 );
 
+function applySwipe(dx, dy) {
+  if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return false;
+
+  // Внутри карточки человека свайп вправо возвращает к списку
+  if (state.detail) {
+    if (dx > 0) {
+      state.detail = null;
+      render();
+    }
+    return true;
+  }
+  const step = dx < 0 ? 1 : -1;
+  const next = TAB_ORDER[TAB_ORDER.indexOf(state.tab) + step];
+  if (next) selectTab(next, step);
+  return true;
+}
+
+// Срабатываем прямо во время жеста, не дожидаясь отрыва пальца —
+// так переход ощущается мгновенным.
+$("#views").addEventListener(
+  "touchmove",
+  (event) => {
+    if (!swipe || swipe.busy || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    if (applySwipe(touch.clientX - swipe.x, touch.clientY - swipe.y)) swipe = null;
+  },
+  { passive: true },
+);
+
 $("#views").addEventListener(
   "touchend",
   (event) => {
     if (!swipe || swipe.busy) return;
     const touch = event.changedTouches[0];
-    const dx = touch.clientX - swipe.x;
-    const dy = touch.clientY - swipe.y;
+    applySwipe(touch.clientX - swipe.x, touch.clientY - swipe.y);
     swipe = null;
-    if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
-
-    // Внутри карточки человека свайп вправо возвращает к списку
-    if (state.detail) {
-      if (dx > 0) {
-        state.detail = null;
-        render();
-      }
-      return;
-    }
-    const step = dx < 0 ? 1 : -1;
-    const next = TAB_ORDER[TAB_ORDER.indexOf(state.tab) + step];
-    if (next) selectTab(next, step);
   },
   { passive: true },
 );
@@ -202,7 +217,12 @@ async function render() {
   const container = viewEl(state.tab);
   const button = $("#refresh");
   button.classList.add("is-busy");
-  skeleton(container, state.tab === "balance");
+  // Заглушку показываем только на пустой вкладке. Если там уже есть
+  // цифры — оставляем их на экране и подменяем, когда придут свежие:
+  // переход не мигает и ощущается мгновенным.
+  if (!container.firstChild || container.querySelector(".skeleton")) {
+    skeleton(container, state.tab === "balance");
+  }
   // Свежая анимация появления на каждую перерисовку; при свайпе
   // содержимое въезжает с той стороны, откуда пришли.
   container.classList.remove("is-entering", "is-from-left", "is-from-right");
