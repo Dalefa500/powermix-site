@@ -227,17 +227,18 @@ function startDrag(step) {
   drag = { step, next, incoming, outgoing, width: views.clientWidth || window.innerWidth, dx: 0 };
 }
 
+/* Оба экрана едут за пальцем один в один: вкладки лежат встык, как
+   одно полотно, и жест тянет это полотно целиком. Ничего не наезжает
+   друг на друга и не притухает. */
 function paintDrag(dx) {
-  const { incoming, outgoing, step, width } = drag;
+  const { incoming, outgoing, step } = drag;
   if (!incoming) {
-    // У края списка вкладок экран только пружинит
+    // У края списка вкладок полотно только пружинит
     outgoing.style.transform = `translate3d(${dx / 3}px, 0, 0)`;
     return;
   }
   incoming.style.transform = `translate3d(calc(${step * 100}% + ${dx}px), 0, 0)`;
-  const part = Math.min(1, Math.abs(dx) / width);
-  outgoing.style.transform = `translate3d(${dx * 0.32}px, 0, 0)`;
-  outgoing.style.opacity = String(1 - 0.45 * part);
+  outgoing.style.transform = `translate3d(${dx}px, 0, 0)`;
 }
 
 // Доводим экраны до конца или возвращаем на место. Время берём по
@@ -290,12 +291,10 @@ function settleDrag(commit) {
     });
     if (commit) {
       if (incoming) incoming.style.transform = "translate3d(0, 0, 0)";
-      outgoing.style.transform = `translate3d(${-step * 32}%, 0, 0)`;
-      outgoing.style.opacity = ".55";
+      outgoing.style.transform = `translate3d(${-step * 100}%, 0, 0)`;
     } else {
       if (incoming) incoming.style.transform = `translate3d(${step * 100}%, 0, 0)`;
       outgoing.style.transform = "translate3d(0, 0, 0)";
-      outgoing.style.opacity = "1";
     }
   });
 }

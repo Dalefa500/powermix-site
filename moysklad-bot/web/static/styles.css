@@ -310,8 +310,9 @@ svg { display: block; }
   padding: 16px 16px 24px;
 }
 
-/* Переход как в iOS: новый экран приходит от края на полной скорости,
-   старый уходит втрое медленнее и притухает — отсюда ощущение глубины.
+/* Переход — перелистывание единого полотна: вкладки лежат встык и
+   едут вместе, с одинаковой скоростью, ничего не наезжает и не
+   притухает. Так же, как под пальцем при свайпе.
    Кривая — та же, что у системных панелей iOS. */
 :root { --ios-ease: cubic-bezier(.32, .72, 0, 1); --ios-time: .34s; }
 
@@ -357,12 +358,12 @@ svg { display: block; }
   to { transform: none; }
 }
 @keyframes push-out {
-  from { transform: none; opacity: 1; }
-  to { transform: translateX(-32%); opacity: .55; }
+  from { transform: none; }
+  to { transform: translateX(-100%); }
 }
 @keyframes push-out-back {
-  from { transform: none; opacity: 1; }
-  to { transform: translateX(32%); opacity: .55; }
+  from { transform: none; }
+  to { transform: translateX(100%); }
 }
 
 /* Свайп: экраны идут за пальцем. Пока палец на экране — никаких
