@@ -28,6 +28,28 @@ let quietEntry = false;
 // и нажатия визуально не отзываются.
 document.addEventListener("touchstart", () => {}, { passive: true });
 
+/* При запуске установленного на экран приложения iOS иногда отдаёт
+   странице высоту экрана без выреза: снизу остаётся незанятая полоса.
+   Поворот экрана её убирает — значит достаточно заставить систему
+   пересчитать раскладку. Делаем это сами: на миг правим мета-тег
+   viewport и возвращаем обратно. Трогаем только там, где разрыв
+   действительно есть, — в обычном браузере ничего не меняется. */
+function nudgeViewport() {
+  const standalone =
+    window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+  const full = window.screen && window.screen.height;
+  if (!standalone || !full) return;
+  const gap = full - window.innerHeight;
+  if (gap <= 0 || gap > 120) return; // не похоже на вырез — не вмешиваемся
+
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) return;
+  const base = meta.getAttribute("content");
+  meta.setAttribute("content", `${base}, initial-scale=1.0001`);
+  requestAnimationFrame(() => meta.setAttribute("content", base));
+}
+window.addEventListener("load", () => setTimeout(nudgeViewport, 120));
+
 const $ = (sel) => document.querySelector(sel);
 const viewEl = (name) => document.querySelector(`.view[data-view="${name}"]`);
 
