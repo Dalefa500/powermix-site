@@ -297,7 +297,6 @@ svg { display: block; }
   min-height: 0; /* иначе flex-элемент не сжимается и скролл не появится */
   overflow-x: clip;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   max-width: 640px; margin: 0 auto;
   width: 100%;
@@ -314,7 +313,13 @@ svg { display: block; }
    едут вместе, с одинаковой скоростью, ничего не наезжает и не
    притухает. Так же, как под пальцем при свайпе.
    Кривая — та же, что у системных панелей iOS. */
-:root { --ios-ease: cubic-bezier(.32, .72, 0, 1); --ios-time: .34s; }
+:root {
+  --ios-ease: cubic-bezier(.32, .72, 0, 1);
+  --ios-time: .34s;
+  /* Доводка после отрыва пальца: начинается со скоростью жеста и
+     мягко гаснет, без рывка на старте. */
+  --glide: cubic-bezier(.17, .84, .25, 1);
+}
 
 .view.is-entering {
   animation: rise .22s cubic-bezier(.25, .9, .3, 1) backwards;
@@ -381,8 +386,7 @@ svg { display: block; }
   will-change: transform, opacity;
 }
 .view.is-settling {
-  transition: transform var(--ios-time) var(--ios-ease),
-              opacity var(--ios-time) var(--ios-ease);
+  transition: transform var(--ios-time) var(--glide);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -592,7 +596,7 @@ svg { display: block; }
 
 .chips {
   display: flex; gap: 10px; overflow-x: auto;
-  padding: 2px 16px; margin: 0 -16px;
+  padding: 2px 16px; margin: -8px -16px 0;
   scrollbar-width: none;
 }
 .chips::-webkit-scrollbar { display: none; }
@@ -613,18 +617,18 @@ svg { display: block; }
     inset 0 -1px 0 rgba(0, 0, 0, .45);
   transition: transform .1s ease;
 }
-/* Выбранный период — фирменный синий, не красный: красный в
-   приложении держится за кнопку «Войти» и тревожные значения,
-   отдельная сущность для фильтра быть не должна. */
+/* Выбранный период — оранжевый, не красный: красный в приложении
+   держится за кнопку «Войти» и тревожные значения. Тон взят глубокий:
+   на светлом оранжевом белая надпись тонет, на этом контраст 4.6. */
 .chip.is-active {
   color: #fff;
-  background: linear-gradient(180deg, #4f97e0 0%, #2569bd 48%, #123e73 100%);
+  background: linear-gradient(180deg, #e08b34 0%, #b05c0b 48%, #6b3304 100%);
   border-color: rgba(255, 255, 255, .3);
-  text-shadow: 0 1px 2px rgba(6, 30, 60, .55);
+  text-shadow: 0 1px 2px rgba(60, 25, 0, .55);
   box-shadow:
     inset 0 1.5px 0 rgba(255, 255, 255, .55),
-    inset 0 -2px 6px rgba(6, 40, 80, .5),
-    0 3px 0 -1px #0d2c50,
+    inset 0 -2px 6px rgba(70, 30, 0, .5),
+    0 3px 0 -1px #4d2503,
     0 8px 16px -8px rgba(0, 0, 0, .9);
 }
 .chip { transition: transform .24s cubic-bezier(.22, 1.4, .4, 1), filter .18s ease; }
