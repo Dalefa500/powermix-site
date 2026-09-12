@@ -57,17 +57,22 @@ body {
   overscroll-behavior-y: none;
   background: #0a0a0d;
   height: 100dvh;
+  height: var(--app-height, 100dvh);
   overflow: hidden;
 }
 
 /* Каркас — шапка и таббар больше не «плавают» поверх страницы, а
    стоят неподвижными полосами flex-колонки. Скроллится только сама
    вкладка (#views), поэтому смена высоты контента между вкладками
-   не двигает верх и низ — раньше именно это дёргало кнопки. */
+   не двигает верх и низ — раньше именно это дёргало кнопки.
+   --app-height считает app.js по реальному окну: dvh в установленном
+   на экран PWA на iOS иногда промахивается на несколько пикселей, и
+   низ интерфейса срезало. */
 #app {
   display: flex;
   flex-direction: column;
   height: 100dvh;
+  height: var(--app-height, 100dvh);
   overflow: hidden;
 }
 
@@ -375,9 +380,20 @@ svg { display: block; }
   height: calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   align-items: end;
-  background: linear-gradient(0deg,
-    rgba(6, 5, 8, .94) 0%, rgba(6, 5, 8, .88) 46%, rgba(6, 5, 8, 0) 100%);
+  /* Сплошной, а не гаснущий в прозрачность фон — раньше градиент
+     доходил до нуля ровно на высоте safe-area, и в зоне под кнопками,
+     у самого края экрана, было видно шов: другой, более светлый
+     оттенок. Плавный переход вынесен в ::before над баром. */
+  background: #08070a;
   border-top: 0;
+}
+.tabbar::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 100%;
+  height: 18px;
+  background: linear-gradient(0deg, #08070a 0%, rgba(8, 7, 10, 0) 100%);
+  pointer-events: none;
 }
 .tab {
   display: grid; place-items: center; gap: 4px;
@@ -566,35 +582,40 @@ svg { display: block; }
 /* ── Периоды ───────────────────────────────────────────── */
 
 .chips {
-  display: flex; gap: 8px; overflow-x: auto;
+  display: flex; gap: 10px; overflow-x: auto;
   padding: 2px 16px; margin: 0 -16px;
   scrollbar-width: none;
 }
 .chips::-webkit-scrollbar { display: none; }
 .chip {
   flex: none;
-  padding: 10px 16px;
+  /* Крупнее и просторнее — на телефоне палец должен уверенно попадать
+     без соседей под удар; блюр убран — на полосе из полутора десятков
+     плашек он проседал по кадрам и делал нажатие «вязким». */
+  padding: 12px 18px;
+  min-height: 44px;
   border-radius: 999px;
   font-size: 14.5px; font-weight: 700; white-space: nowrap;
   color: var(--ink-2);
-  background: linear-gradient(180deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .03));
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, .045));
   border: 1px solid rgba(255, 255, 255, .14);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, .3),
     inset 0 -1px 0 rgba(0, 0, 0, .45);
   transition: transform .1s ease;
 }
+/* Выбранный период — фирменный синий, не красный: красный в
+   приложении держится за кнопку «Войти» и тревожные значения,
+   отдельная сущность для фильтра быть не должна. */
 .chip.is-active {
   color: #fff;
-  background: linear-gradient(180deg, #ff6058 0%, #ef1b24 48%, #c50d16 100%);
+  background: linear-gradient(180deg, #4f97e0 0%, #2569bd 48%, #123e73 100%);
   border-color: rgba(255, 255, 255, .3);
-  text-shadow: 0 1px 2px rgba(120, 0, 6, .55);
+  text-shadow: 0 1px 2px rgba(6, 30, 60, .55);
   box-shadow:
     inset 0 1.5px 0 rgba(255, 255, 255, .55),
-    inset 0 -2px 6px rgba(110, 0, 6, .5),
-    0 3px 0 -1px #8a060e,
+    inset 0 -2px 6px rgba(6, 40, 80, .5),
+    0 3px 0 -1px #0d2c50,
     0 8px 16px -8px rgba(0, 0, 0, .9);
 }
 .chip { transition: transform .24s cubic-bezier(.22, 1.4, .4, 1), filter .18s ease; }
