@@ -28,20 +28,6 @@ let quietEntry = false;
 // и нажатия визуально не отзываются.
 document.addEventListener("touchstart", () => {}, { passive: true });
 
-// 100dvh в установленном на экран PWA на iOS иногда не совпадает с
-// реальной высотой окна (адресную строку показывать некуда, но старые
-// версии Safari всё равно промахиваются на несколько пикселей) —
-// из-за этого низ приложения обрезался. Меряем окно сами и держим
-// в переменной, CSS берёт её в приоритете перед dvh.
-function setAppHeight() {
-  const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-  document.documentElement.style.setProperty("--app-height", `${h}px`);
-}
-setAppHeight();
-window.addEventListener("resize", setAppHeight);
-window.addEventListener("orientationchange", setAppHeight);
-if (window.visualViewport) window.visualViewport.addEventListener("resize", setAppHeight);
-
 const $ = (sel) => document.querySelector(sel);
 const viewEl = (name) => document.querySelector(`.view[data-view="${name}"]`);
 

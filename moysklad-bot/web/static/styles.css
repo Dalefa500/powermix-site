@@ -48,42 +48,12 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Segoe UI", sans-serif;
-  color: var(--ink);
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
-  background: #0a0a0d;
+/* Фактура живёт на корневом элементе, а не отдельным слоем внутри
+   страницы: фон корня растягивается на всё полотно отрисовки и не
+   может не дойти до края экрана. Раньше это был body::before —
+   его обрезало по высоте body, и внизу оставалась гладкая полоса. */
+html {
   height: 100dvh;
-  height: var(--app-height, 100dvh);
-  overflow: hidden;
-}
-
-/* Каркас — шапка и таббар больше не «плавают» поверх страницы, а
-   стоят неподвижными полосами flex-колонки. Скроллится только сама
-   вкладка (#views), поэтому смена высоты контента между вкладками
-   не двигает верх и низ — раньше именно это дёргало кнопки.
-   --app-height считает app.js по реальному окну: dvh в установленном
-   на экран PWA на iOS иногда промахивается на несколько пикселей, и
-   низ интерфейса срезало. */
-#app {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-  height: var(--app-height, 100dvh);
-  overflow: hidden;
-}
-
-/* Та же крапчатая поверхность, что на входе, только приглушённее —
-   карточки и цифры должны оставаться читаемыми. Отдельным слоем,
-   чтобы фон не уезжал при прокрутке. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
   background:
     /* тёмная вуаль поверх зерна — фактура видна, но не светит */
     linear-gradient(rgba(0, 0, 0, .42), rgba(0, 0, 0, .42)),
@@ -92,6 +62,31 @@ body::before {
   background-size: auto, 256px 256px, auto;
 }
 
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Segoe UI", sans-serif;
+  color: var(--ink);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Каркас — шапка и таббар больше не «плавают» поверх страницы, а
+   стоят неподвижными полосами flex-колонки. Скроллится только сама
+   вкладка (#views), поэтому смена высоты контента между вкладками
+   не двигает верх и низ — раньше именно это дёргало кнопки. */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Та же крапчатая поверхность, что на входе, только приглушённее —
+   карточки и цифры должны оставаться читаемыми. Отдельным слоем,
+   чтобы фон не уезжал при прокрутке. */
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 svg { display: block; }
 [hidden] { display: none !important; }
