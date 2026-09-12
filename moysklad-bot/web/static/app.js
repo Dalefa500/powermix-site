@@ -28,13 +28,14 @@ let quietEntry = false;
 // и нажатия визуально не отзываются.
 document.addEventListener("touchstart", () => {}, { passive: true });
 
-/* При запуске установленного на экран приложения iOS иногда отдаёт
-   странице высоту экрана без выреза: снизу остаётся незанятая полоса.
-   Поворот экрана её убирает — значит достаточно заставить систему
-   пересчитать раскладку. Делаем это сами: на миг правим мета-тег
-   viewport и возвращаем обратно. Трогаем только там, где разрыв
+/* При запуске установленного на экран приложения iOS отдаёт странице
+   высоту экрана без выреза: снизу остаётся незанятая полоса. Поворот
+   экрана её убирает — значит система умеет посчитать правильно, просто
+   при старте этого не делает. Просим явно: в мета-теге viewport Safari
+   понимает высоту, ставим её равной высоте экрана. Трогаем только
+   установленное приложение и только когда разрыв размером с вырез
    действительно есть, — в обычном браузере ничего не меняется. */
-function nudgeViewport() {
+function fixViewportHeight() {
   const standalone =
     window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
   const full = window.screen && window.screen.height;
@@ -44,11 +45,12 @@ function nudgeViewport() {
 
   const meta = document.querySelector('meta[name="viewport"]');
   if (!meta) return;
-  const base = meta.getAttribute("content");
-  meta.setAttribute("content", `${base}, initial-scale=1.0001`);
-  requestAnimationFrame(() => meta.setAttribute("content", base));
+  meta.setAttribute(
+    "content",
+    `width=device-width, initial-scale=1, viewport-fit=cover, height=${full}`,
+  );
 }
-window.addEventListener("load", () => setTimeout(nudgeViewport, 120));
+window.addEventListener("load", () => setTimeout(fixViewportHeight, 150));
 
 const $ = (sel) => document.querySelector(sel);
 const viewEl = (name) => document.querySelector(`.view[data-view="${name}"]`);

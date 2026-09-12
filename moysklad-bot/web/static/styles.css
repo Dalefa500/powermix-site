@@ -30,6 +30,14 @@
   /* Знак суммы: плюс зелёным, минус красным. Контраст 7.5:1. */
   --good: #3fbf7f;
 
+  /* Поверхность приложения: базовый тон и крапчатая фактура.
+     Одна запись на всех — фон экрана и едущие при свайпе вкладки
+     должны быть одним и тем же полотном. */
+  --surface: #0b0a0e;
+  --surface-image:
+    linear-gradient(rgba(0, 0, 0, .42), rgba(0, 0, 0, .42)),
+    url("/icons/grain.png");
+
   --radius: 24px;
   --radius-sm: 16px;
   --tabbar-h: 62px;
@@ -66,7 +74,7 @@ body {
   overflow: hidden;
   /* Базовый тон WebKit сам растягивает на всё окно приложения —
      даже туда, куда не достаёт сама страница. */
-  background-color: #0b0a0e;
+  background-color: var(--surface);
 }
 
 /* Фактура — отдельным слоем с запасом ниже экрана. При запуске iOS
@@ -82,11 +90,8 @@ body::before {
   height: calc(100dvh + 160px);
   z-index: -1;
   pointer-events: none;
-  background-color: #0b0a0e;
-  background-image:
-    /* тёмная вуаль поверх зерна — фактура видна, но не светит */
-    linear-gradient(rgba(0, 0, 0, .42), rgba(0, 0, 0, .42)),
-    url("/icons/grain.png");
+  background-color: var(--surface);
+  background-image: var(--surface-image);
   background-size: auto, 256px 256px;
   background-repeat: repeat, repeat;
 }
@@ -325,9 +330,11 @@ svg { display: block; }
 .view.is-from-left {
   position: relative;
   z-index: 2;
-  background: linear-gradient(180deg, #100e13 0%, #0a090d 40%, #060508 100%);
+  background-color: var(--surface);
+  background-image: var(--surface-image);
+  background-size: auto, 256px 256px;
+  background-repeat: repeat, repeat;
   animation: push-in var(--ios-time) var(--ios-ease) backwards;
-  box-shadow: 0 0 34px rgba(0, 0, 0, .85);
 }
 .view.is-from-left { animation-name: push-in-back; }
 
@@ -364,8 +371,12 @@ svg { display: block; }
   position: absolute;
   top: 0; left: 0; right: 0;
   z-index: 2;
-  background: linear-gradient(180deg, #100e13 0%, #0a090d 40%, #060508 100%);
-  box-shadow: 0 0 34px rgba(0, 0, 0, .85);
+  /* Едущий экран несёт ту же поверхность, что и всё приложение:
+     видно, как уезжает полотно, а не чёрная плита с тенью. */
+  background-color: var(--surface);
+  background-image: var(--surface-image);
+  background-size: auto, 256px 256px;
+  background-repeat: repeat, repeat;
   pointer-events: none;
   will-change: transform;
 }
