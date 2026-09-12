@@ -232,13 +232,16 @@ svg { display: block; }
 /* Панели без размытия и без границы: фактура фона проходит сквозь них
    непрерывно, и экран читается как одна поверхность, а не три полосы.
    Затемнение растворяется к краю содержимого. */
+/* Шапка и таббар — без собственной подложки: крапчатая фактура идёт
+   через весь экран одним полотном. Контент под них не заезжает —
+   прокручивается только #views между ними, — поэтому затемнять
+   полосы не нужно. */
 .topbar {
   position: relative; z-index: 20; flex: none;
   display: flex; align-items: center; gap: 4px;
   padding: 12px 14px;
   padding-top: calc(12px + env(safe-area-inset-top));
-  background: linear-gradient(180deg,
-    rgba(6, 5, 8, .9) 0%, rgba(6, 5, 8, .74) 58%, rgba(6, 5, 8, 0) 100%);
+  background: none;
   border-bottom: 0;
 }
 .topbar__title {
@@ -286,9 +289,10 @@ svg { display: block; }
 }
 .view {
   display: grid; gap: 16px;
-  /* Таббар больше не лежит поверх контента, а стоит своей полосой —
-     хватает небольшого отступа снизу. */
-  padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+  /* Таббар больше не лежит поверх контента, а стоит своей полосой и
+     сам держит отступ от края экрана — здесь хватает воздуха в конце
+     прокрутки. */
+  padding: 16px 16px 24px;
 }
 
 /* Переход как в iOS: новый экран приходит от края на полной скорости,
@@ -377,23 +381,13 @@ svg { display: block; }
 .tabbar {
   position: relative; z-index: 20; flex: none;
   display: grid; grid-template-columns: repeat(4, 1fr);
-  height: calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
+  /* Кнопки прижаты к нижнему краю: под подписями остаётся небольшой
+     зазор от жестовой полосы iPhone, а не вся её зона целиком. */
+  height: calc(var(--tabbar-h) + 8px + env(safe-area-inset-bottom) * .5);
+  padding-bottom: calc(env(safe-area-inset-bottom) * .5);
   align-items: end;
-  /* Сплошной, а не гаснущий в прозрачность фон — раньше градиент
-     доходил до нуля ровно на высоте safe-area, и в зоне под кнопками,
-     у самого края экрана, было видно шов: другой, более светлый
-     оттенок. Плавный переход вынесен в ::before над баром. */
-  background: #08070a;
+  background: none;
   border-top: 0;
-}
-.tabbar::before {
-  content: "";
-  position: absolute;
-  left: 0; right: 0; bottom: 100%;
-  height: 18px;
-  background: linear-gradient(0deg, #08070a 0%, rgba(8, 7, 10, 0) 100%);
-  pointer-events: none;
 }
 .tab {
   display: grid; place-items: center; gap: 4px;

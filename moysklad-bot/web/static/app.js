@@ -468,11 +468,31 @@ async function render() {
   }
 }
 
+/* Полоса периодов не пересобирается при смене периода: она остаётся
+   в DOM, у неё лишь переезжает отметка, а всё, что было под ней,
+   заменяется. Раньше при каждом нажатии плашки создавались заново и
+   вся лента вздрагивала, теряя прокрутку. */
+function resetWithChips(container, current, onPick) {
+  const strip = container.querySelector(".chips");
+  if (!strip) {
+    container.replaceChildren(chips(current, onPick));
+    return;
+  }
+  while (strip.nextSibling) strip.nextSibling.remove();
+  while (strip.previousSibling) strip.previousSibling.remove();
+  strip.querySelectorAll(".chip").forEach((chip, i) => {
+    chip.classList.toggle("is-active", PERIODS[i].days === current);
+  });
+}
+
 function chips(current, onPick) {
   const wrap = el("div", "chips");
   PERIODS.forEach((period) => {
     const chip = el("button", "chip" + (period.days === current ? " is-active" : ""), period.label);
     chip.type = "button";
+    // Без этого браузер ставит нажатую плашку в фокус и подтягивает её
+    // к центру — лента дёргается прямо под пальцем.
+    chip.addEventListener("mousedown", (event) => event.preventDefault());
     chip.addEventListener("click", () => onPick(period.days));
     wrap.append(chip);
   });
@@ -561,14 +581,11 @@ async function renderBalance(container) {
 
 async function renderReport(container) {
   const data = await api(`/api/report?days=${state.reportDays}`);
-  container.replaceChildren();
-
-  container.append(
-    chips(state.reportDays, (days) => {
-      state.reportDays = days;
-      render();
-    }),
-  );
+  resetWithChips(container, state.reportDays, (days) => {
+    state.reportDays = days;
+    quietEntry = true; // меняется только период — вкладке незачем появляться заново
+    render();
+  });
 
   container.append(
     tiles([
@@ -692,14 +709,11 @@ async function renderStock(container) {
 
 async function renderTeam(container) {
   const data = await api(`/api/team?days=${state.teamDays}`);
-  container.replaceChildren();
-
-  container.append(
-    chips(state.teamDays, (days) => {
-      state.teamDays = days;
-      render();
-    }),
-  );
+  resetWithChips(container, state.teamDays, (days) => {
+    state.teamDays = days;
+    quietEntry = true;
+    render();
+  });
 
   const card = el("div", "card");
   card.append(el("div", "card__title", "Расход за период"));
@@ -735,14 +749,11 @@ async function renderTeamDetail(container) {
   const data = await api(
     `/api/team/detail?days=${state.teamDays}&href=${encodeURIComponent(state.detail.href)}`,
   );
-  container.replaceChildren();
-
-  container.append(
-    chips(state.teamDays, (days) => {
-      state.teamDays = days;
-      render();
-    }),
-  );
+  resetWithChips(container, state.teamDays, (days) => {
+    state.teamDays = days;
+    quietEntry = true;
+    render();
+  });
 
   container.append(
     tiles([
