@@ -146,7 +146,7 @@ function selectTab(name, from = 0) {
     leaving.hidden = true;
   }
 
-  window.scrollTo(0, 0);
+  views.scrollTop = 0;
   render();
 }
 
@@ -238,7 +238,7 @@ function settleDrag(commit) {
       state.tab = next;
       state.from = 0;
       markTab(next);
-      window.scrollTo(0, 0);
+      views.scrollTop = 0;
       quietEntry = true; // содержимое уже на экране — не проигрываем появление
       render();
     } else if (incoming) {
@@ -707,7 +707,7 @@ async function renderTeam(container) {
       row.append(chev);
       row.addEventListener("click", () => {
         state.detail = { href: person.href, name: person.name };
-        window.scrollTo(0, 0);
+        views.scrollTop = 0;
         render();
       });
       rows.append(row);

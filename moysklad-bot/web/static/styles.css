@@ -56,6 +56,19 @@ body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
   background: #0a0a0d;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Каркас — шапка и таббар больше не «плавают» поверх страницы, а
+   стоят неподвижными полосами flex-колонки. Скроллится только сама
+   вкладка (#views), поэтому смена высоты контента между вкладками
+   не двигает верх и низ — раньше именно это дёргало кнопки. */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 /* Та же крапчатая поверхность, что на входе, только приглушённее —
@@ -215,7 +228,7 @@ svg { display: block; }
    непрерывно, и экран читается как одна поверхность, а не три полосы.
    Затемнение растворяется к краю содержимого. */
 .topbar {
-  position: sticky; top: 0; z-index: 20;
+  position: relative; z-index: 20; flex: none;
   display: flex; align-items: center; gap: 4px;
   padding: 12px 14px;
   padding-top: calc(12px + env(safe-area-inset-top));
@@ -257,12 +270,20 @@ svg { display: block; }
    совпадать с приходящим по геометрии. */
 #views {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0; /* иначе flex-элемент не сжимается и скролл не появится */
   overflow-x: clip;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
   max-width: 640px; margin: 0 auto;
+  width: 100%;
 }
 .view {
   display: grid; gap: 16px;
-  padding: 16px 16px calc(var(--tabbar-h) + 30px + env(safe-area-inset-bottom));
+  /* Таббар больше не лежит поверх контента, а стоит своей полосой —
+     хватает небольшого отступа снизу. */
+  padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
 }
 
 /* Переход как в iOS: новый экран приходит от края на полной скорости,
@@ -349,7 +370,7 @@ svg { display: block; }
 }
 
 .tabbar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  position: relative; z-index: 20; flex: none;
   display: grid; grid-template-columns: repeat(4, 1fr);
   height: calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
