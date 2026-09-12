@@ -375,8 +375,8 @@ svg { display: block; }
   display: grid; grid-template-columns: repeat(4, 1fr);
   /* Кнопки прижаты к нижнему краю: под подписями остаётся небольшой
      зазор от жестовой полосы iPhone, а не вся её зона целиком. */
-  height: calc(var(--tabbar-h) + 8px + max(8px, env(safe-area-inset-bottom) * .4));
-  padding-bottom: max(8px, calc(env(safe-area-inset-bottom) * .4));
+  height: calc(var(--tabbar-h) + 8px + env(safe-area-inset-bottom) * .5);
+  padding-bottom: calc(env(safe-area-inset-bottom) * .5);
   align-items: end;
   background: none;
   border-top: 0;
