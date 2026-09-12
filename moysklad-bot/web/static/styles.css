@@ -327,14 +327,13 @@ svg { display: block; }
 
 /* Приходящий экран накрывает уходящий — иначе старое просвечивает
    сквозь новое. Тень по краю даёт ощущение слоя. */
+/* Вкладки прозрачные: едет только стекло карточек, а крапчатая
+   подложка стоит на месте. Перекрытия нет — вкладки идут встык,
+   поэтому подкладывать под них фон не нужно. */
 .view.is-from-right,
 .view.is-from-left {
   position: relative;
   z-index: 2;
-  background-color: var(--surface);
-  background-image: var(--surface-image);
-  background-size: auto, 256px 256px;
-  background-repeat: repeat, repeat;
   animation: push-in var(--ios-time) var(--ios-ease) backwards;
 }
 .view.is-from-left { animation-name: push-in-back; }
@@ -372,12 +371,6 @@ svg { display: block; }
   position: absolute;
   top: 0; left: 0; right: 0;
   z-index: 2;
-  /* Едущий экран несёт ту же поверхность, что и всё приложение:
-     видно, как уезжает полотно, а не чёрная плита с тенью. */
-  background-color: var(--surface);
-  background-image: var(--surface-image);
-  background-size: auto, 256px 256px;
-  background-repeat: repeat, repeat;
   pointer-events: none;
   will-change: transform;
 }
@@ -443,10 +436,12 @@ svg { display: block; }
    панели, а не размытое пятно. */
 .card {
   position: relative;
+  /* Без backdrop-filter: размытие фона пересчитывается в каждом кадре
+     и роняет плавность перелистывания, а размывать под карточкой
+     нечего — там ровная крапчатая фактура. Плотность добирается
+     самой заливкой. */
   background: linear-gradient(162deg,
-    rgba(28, 25, 30, .82) 0%, rgba(20, 18, 23, .78) 42%, rgba(16, 14, 19, .8) 100%);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
+    rgba(28, 25, 30, .94) 0%, rgba(20, 18, 23, .92) 42%, rgba(16, 14, 19, .93) 100%);
   border: 1px solid rgba(255, 255, 255, .15);
   border-radius: var(--radius);
   padding: 20px;
@@ -491,9 +486,7 @@ svg { display: block; }
 .tiles--two { grid-template-columns: repeat(2, 1fr); }
 .tile {
   background: linear-gradient(160deg,
-    rgba(28, 25, 30, .8) 0%, rgba(19, 17, 22, .76) 55%, rgba(16, 14, 19, .78) 100%);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+    rgba(28, 25, 30, .93) 0%, rgba(19, 17, 22, .9) 55%, rgba(16, 14, 19, .91) 100%);
   border: 1px solid rgba(255, 255, 255, .14);
   border-radius: var(--radius-sm);
   padding: 15px 12px;
@@ -675,9 +668,7 @@ svg { display: block; }
   padding: 14px 16px;
   font-size: 16px;
   color: var(--ink);
-  background: var(--glass);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: linear-gradient(180deg, rgba(28, 25, 30, .9), rgba(18, 16, 21, .9));
   border: 1px solid var(--glass-edge);
   border-radius: var(--radius-sm);
   outline: none;

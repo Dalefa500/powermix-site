@@ -213,6 +213,7 @@ function startDrag(step) {
   const outgoing = viewEl(state.tab);
   const next = neighbour(step);
   const incoming = next ? viewEl(next) : null;
+  const width = views.clientWidth || window.innerWidth;
 
   document.querySelectorAll(".view.is-leaving").forEach(endLeaving);
   outgoing.classList.add("is-dragging-out");
@@ -222,23 +223,41 @@ function startDrag(step) {
     if (!incoming.firstChild) skeleton(incoming, next === "balance");
     incoming.hidden = false;
     incoming.classList.add("is-dragging-in");
-    incoming.style.transform = `translate3d(${step * 100}%, 0, 0)`;
+    incoming.style.transform = `translate3d(${step * width}px, 0, 0)`;
   }
-  drag = { step, next, incoming, outgoing, width: views.clientWidth || window.innerWidth, dx: 0 };
+  drag = { step, next, incoming, outgoing, width, dx: 0 };
 }
 
 /* Оба экрана едут за пальцем один в один: вкладки лежат встык, как
    одно полотно, и жест тянет это полотно целиком. Ничего не наезжает
    друг на друга и не притухает. */
 function paintDrag(dx) {
-  const { incoming, outgoing, step } = drag;
+  const { incoming, outgoing, step, width } = drag;
   if (!incoming) {
     // У края списка вкладок полотно только пружинит
     outgoing.style.transform = `translate3d(${dx / 3}px, 0, 0)`;
     return;
   }
-  incoming.style.transform = `translate3d(calc(${step * 100}% + ${dx}px), 0, 0)`;
+  // Только пиксели: проценты внутри calc() браузер пересчитывает
+  // от размеров элемента на каждом кадре.
+  incoming.style.transform = `translate3d(${step * width + dx}px, 0, 0)`;
   outgoing.style.transform = `translate3d(${dx}px, 0, 0)`;
+}
+
+/* Палец шлёт события чаще, чем экран успевает обновляться. Рисуем
+   строго раз в кадр — иначе часть работы уходит впустую и движение
+   начинает спотыкаться. */
+let paintPending = false;
+let paintDx = 0;
+
+function queuePaint(dx) {
+  paintDx = dx;
+  if (paintPending) return;
+  paintPending = true;
+  requestAnimationFrame(() => {
+    paintPending = false;
+    if (drag) paintDrag(paintDx);
+  });
 }
 
 // Доводим экраны до конца или возвращаем на место. Время берём по
@@ -291,9 +310,9 @@ function settleDrag(commit) {
     });
     if (commit) {
       if (incoming) incoming.style.transform = "translate3d(0, 0, 0)";
-      outgoing.style.transform = `translate3d(${-step * 100}%, 0, 0)`;
+      outgoing.style.transform = `translate3d(${-step * width}px, 0, 0)`;
     } else {
-      if (incoming) incoming.style.transform = `translate3d(${step * 100}%, 0, 0)`;
+      if (incoming) incoming.style.transform = `translate3d(${step * width}px, 0, 0)`;
       outgoing.style.transform = "translate3d(0, 0, 0)";
     }
   });
@@ -353,7 +372,7 @@ views.addEventListener(
       // Тянуть можно только в ту сторону, куда начали
       const forward = drag.step === 1 ? Math.min(0, move) : Math.max(0, move);
       drag.dx = forward;
-      paintDrag(forward);
+      queuePaint(forward);
     }
     event.preventDefault(); // жест наш — страница вертикально не едет
   },
