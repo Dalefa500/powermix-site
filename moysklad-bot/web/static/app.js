@@ -534,10 +534,13 @@ function chips(current, onPick) {
     chip.addEventListener("click", () => onPick(period.days));
     wrap.append(chip);
   });
-  // Выбранный период может быть далеко справа — подкручиваем к нему.
+  // Выбранный период может быть далеко справа — открываем ту страницу
+  // из четырёх, где он лежит, а не подкручиваем его к центру: иначе
+  // лента встанет посередине и по краям окажутся обрезанные плашки.
   requestAnimationFrame(() => {
-    const active = wrap.querySelector(".is-active");
-    if (active) wrap.scrollLeft = active.offsetLeft - wrap.clientWidth / 2 + active.offsetWidth / 2;
+    const all = [...wrap.querySelectorAll(".chip")];
+    const at = all.findIndex((chip) => chip.classList.contains("is-active"));
+    if (at > 0) wrap.scrollLeft = all[Math.floor(at / 4) * 4].offsetLeft;
   });
   return wrap;
 }
